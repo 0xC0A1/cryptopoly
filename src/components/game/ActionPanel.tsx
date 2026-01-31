@@ -43,32 +43,32 @@ export function ActionPanel() {
   const inJail = myPlayer.inJail && isMyTurn && !myPlayer.hasRolled;
 
   return (
-    <div className="glass rounded-2xl p-4 w-80">
+    <div className="rounded-lg border border-white/20 bg-black/90 p-4 w-80">
       {/* Turn indicator */}
       <div className="mb-4">
-        <div className="text-sm text-white/60">Current Turn</div>
-        <div className="text-lg font-bold text-white">
+        <div className="text-xs text-white/60">Current Turn</div>
+        <div className="text-base font-medium text-white">
           {currentPlayer?.name}
-          {isMyTurn && <span className="text-[var(--primary)]"> (Your Turn!)</span>}
+          {isMyTurn && <span className="text-white/80"> (You)</span>}
         </div>
       </div>
 
       {/* Dice result */}
       {diceResult && (
-        <div className="mb-4 p-3 rounded-xl bg-white/5 text-center">
-          <div className="text-3xl font-bold text-[var(--primary)]">
+        <div className="mb-4 p-3 rounded-lg border border-white/10 text-center">
+          <div className="text-2xl font-semibold text-white">
             {diceResult[0]} + {diceResult[1]} = {diceResult[0] + diceResult[1]}
           </div>
           {diceResult[0] === diceResult[1] && (
-            <div className="text-sm text-[var(--accent)] mt-1">Doubles!</div>
+            <div className="text-xs text-white/70 mt-1">Doubles</div>
           )}
         </div>
       )}
 
       {/* Jail options */}
       {inJail && (
-        <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30">
-          <div className="text-sm text-red-400 mb-2">You're in Jail!</div>
+        <div className="mb-4 p-3 rounded-lg border border-white/30">
+          <div className="text-sm text-white/90 mb-2">You're in Jail</div>
           <div className="space-y-2">
             <button
               onClick={payJailFine}
@@ -119,11 +119,11 @@ export function ActionPanel() {
 
           {/* Buy Property Decision */}
           {pendingAction?.type === 'buy-decision' && isMyTurn && (
-            <div className="p-3 rounded-xl bg-[var(--primary)]/10 border border-[var(--primary)]/30">
-              <div className="text-sm text-[var(--primary)] mb-2">
+            <div className="p-3 rounded-lg border border-white/30">
+              <div className="text-sm text-white/80 mb-2">
                 Buy {TILES[pendingAction.tileIndex].name}?
               </div>
-              <div className="text-xl font-bold text-white mb-3">
+              <div className="text-lg font-semibold text-white mb-3">
                 ${pendingAction.price}
               </div>
               <div className="flex gap-2">
@@ -146,11 +146,11 @@ export function ActionPanel() {
 
           {/* Pay Rent */}
           {pendingAction?.type === 'pay-rent' && isMyTurn && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30">
-              <div className="text-sm text-red-400 mb-2">
+            <div className="p-3 rounded-lg border border-white/30">
+              <div className="text-sm text-white/80 mb-2">
                 Pay Rent to {gameState.players[pendingAction.toPlayerId]?.name}
               </div>
-              <div className="text-xl font-bold text-white mb-3">
+              <div className="text-lg font-semibold text-white mb-3">
                 ${pendingAction.amount}
               </div>
               <button
@@ -164,11 +164,11 @@ export function ActionPanel() {
 
           {/* Pay Tax */}
           {pendingAction?.type === 'pay-tax' && isMyTurn && (
-            <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/30">
-              <div className="text-sm text-yellow-400 mb-2">
+            <div className="p-3 rounded-lg border border-white/30">
+              <div className="text-sm text-white/80 mb-2">
                 Pay Tax
               </div>
-              <div className="text-xl font-bold text-white mb-3">
+              <div className="text-lg font-semibold text-white mb-3">
                 ${pendingAction.amount}
               </div>
               <button
@@ -182,8 +182,8 @@ export function ActionPanel() {
 
           {/* Draw Card */}
           {pendingAction?.type === 'draw-card' && isMyTurn && (
-            <div className="p-3 rounded-xl bg-[var(--secondary)]/10 border border-[var(--secondary)]/30">
-              <div className="text-sm text-[var(--secondary)] mb-2">
+            <div className="p-3 rounded-lg border border-white/30">
+              <div className="text-sm text-white/80 mb-2">
                 {pendingAction.cardType === 'chance' ? 'Market Volatility' : 'Airdrop'}
               </div>
               <button
@@ -197,8 +197,8 @@ export function ActionPanel() {
 
           {/* Card Action */}
           {pendingAction?.type === 'card-action' && gameState.drawnCard && isMyTurn && (
-            <div className="p-3 rounded-xl bg-[var(--secondary)]/10 border border-[var(--secondary)]/30">
-              <div className="text-lg font-bold text-white mb-1">
+            <div className="p-3 rounded-lg border border-white/30">
+              <div className="text-base font-semibold text-white mb-1">
                 {gameState.drawnCard.title}
               </div>
               <div className="text-sm text-white/70 mb-3">
@@ -215,11 +215,11 @@ export function ActionPanel() {
 
           {/* Auction */}
           {pendingAction?.type === 'auction' && (
-            <div className="p-3 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/30">
-              <div className="text-sm text-[var(--accent)] mb-2">
+            <div className="p-3 rounded-lg border border-white/30">
+              <div className="text-sm text-white/80 mb-2">
                 Auction: {TILES[pendingAction.tileIndex].name}
               </div>
-              <div className="text-lg text-white mb-2">
+              <div className="text-base text-white mb-2">
                 Current Bid: ${pendingAction.currentBid}
                 {pendingAction.currentBidderId && (
                   <span className="text-sm text-white/60 ml-2">
@@ -275,8 +275,8 @@ export function ActionPanel() {
 
       {/* Not your turn message */}
       {!isMyTurn && (
-        <div className="text-center text-white/60 py-4">
-          Waiting for {currentPlayer?.name} to play...
+        <div className="text-center text-white/50 text-sm py-4">
+          Waiting for {currentPlayer?.name}...
         </div>
       )}
     </div>

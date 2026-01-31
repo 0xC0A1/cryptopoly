@@ -14,10 +14,10 @@ const GameScene = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-full flex items-center justify-center bg-[#0a0a0f]">
+      <div className="w-full h-full flex items-center justify-center bg-black">
         <div className="text-center">
           <div className="spinner mx-auto mb-4" />
-          <div className="text-white/60">Loading 3D scene...</div>
+          <div className="text-white/60 text-sm">Loading 3D scene...</div>
         </div>
       </div>
     ),
@@ -39,20 +39,20 @@ function GameHeader() {
   return (
     <header className="absolute top-0 left-0 right-0 z-10 p-4 flex items-center justify-between">
       <div className="flex items-center gap-4">
-        <h1 className="text-2xl font-bold text-gradient">CRYPTOPOLY</h1>
+        <h1 className="text-xl font-semibold text-white tracking-tight">CRYPTOPOLY</h1>
         {roomId && (
-          <div className="glass px-3 py-1 rounded-lg text-sm">
-            <span className="text-white/60">Room: </span>
-            <span className="text-[var(--primary)] font-mono">{roomId}</span>
+          <div className="px-3 py-1.5 rounded-lg border border-white/20 text-sm">
+            <span className="text-white/60">Room </span>
+            <span className="text-white font-medium">{roomId}</span>
           </div>
         )}
       </div>
 
       <div className="flex items-center gap-4">
         {gameState?.phase === 'finished' && gameState.winnerId && (
-          <div className="glass px-4 py-2 rounded-lg">
-            <span className="text-[var(--primary)]">Winner: </span>
-            <span className="text-white font-bold">
+          <div className="px-4 py-2 rounded-lg border border-white/20 text-sm">
+            <span className="text-white/70">Winner </span>
+            <span className="text-white font-medium">
               {gameState.players[gameState.winnerId]?.name}
             </span>
           </div>
@@ -77,27 +77,24 @@ function WinnerOverlay() {
   const winner = gameState.players[gameState.winnerId];
 
   return (
-    <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center">
+    <div className="absolute inset-0 z-50 bg-black/90 flex items-center justify-center">
       <div className="card text-center max-w-md mx-4">
-        <div className="text-6xl mb-4">🎉</div>
-        <h2 className="text-3xl font-bold text-gradient mb-2">Game Over!</h2>
-        <p className="text-xl text-white mb-2">
-          <span className="text-[var(--primary)]">{winner?.name}</span> wins!
+        <h2 className="text-2xl font-semibold text-white mb-2">Game Over</h2>
+        <p className="text-lg text-white mb-1">
+          {winner?.name} wins
         </p>
-        <p className="text-white/60 mb-6">
+        <p className="text-white/60 mb-6 text-sm">
           Final wealth: ${winner?.money.toLocaleString()}
         </p>
-        <div className="flex gap-4 justify-center">
-          <button
-            onClick={() => {
-              useGameStore.getState().reset();
-              router.push('/');
-            }}
-            className="btn btn-primary"
-          >
-            Play Again
-          </button>
-        </div>
+        <button
+          onClick={() => {
+            useGameStore.getState().reset();
+            router.push('/');
+          }}
+          className="btn btn-primary"
+        >
+          Play Again
+        </button>
       </div>
     </div>
   );
@@ -188,9 +185,9 @@ export default function GamePage() {
       <WinnerOverlay />
 
       {/* Instructions */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 glass rounded-lg px-4 py-2">
-        <p className="text-sm text-white/60">
-          Drag to rotate • Scroll to zoom • Click properties for details
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 rounded-lg border border-white/20 bg-black/80 px-4 py-2">
+        <p className="text-xs text-white/60">
+          Drag to rotate · Scroll to zoom · Click properties for details
         </p>
       </div>
     </div>

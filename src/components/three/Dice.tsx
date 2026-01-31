@@ -2,8 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { RigidBody, RapierRigidBody, CuboidCollider } from '@react-three/rapier';
-import { Text } from '@react-three/drei';
+import { RigidBody, RapierRigidBody, CuboidCollider, interactionGroups } from '@react-three/rapier';
 import * as THREE from 'three';
 
 /** Seeded RNG (mulberry32) – same seed produces same sequence on all clients */
@@ -166,7 +165,7 @@ function SingleDie({ position, color, onSettled, triggerRoll, targetValue, getNe
       friction={0.8}
       mass={1}
     >
-      <CuboidCollider args={[0.5, 0.5, 0.5]} />
+      <CuboidCollider args={[0.5, 0.5, 0.5]} collisionGroups={interactionGroups(0)} />
       <mesh ref={meshRef} castShadow>
         <boxGeometry args={[1, 1, 1]} />
         <meshStandardMaterial
@@ -328,11 +327,11 @@ export function Dice({ onRollComplete, isRolling, targetResult, rollId = 0, dice
     [reportRollOnce]
   );
 
-  // Dice pit: closed box so dice can never fall off. Floor, 4 walls (tall), ceiling.
-  // Half-extents: pit is 12×12 in x/z, floor at y=1, ceiling at y=14.
+  // Dice pit: closed box so dice land on the board. Board top is at y=0.15 (BOARD_HEIGHT/2).
+  // Floor collider top = PIT_FLOOR_Y + 0.5; set so that equals 0.15 so dice rest on table.
   const PIT_HALF = 6;
-  const PIT_FLOOR_Y = 0.5;
-  const PIT_WALL_HEIGHT = 7; // wall center y=7, so y from 0 to 14
+  const PIT_FLOOR_Y = 0.15 - 0.5; // -0.35 so floor top is at 0.15 (board top)
+  const PIT_WALL_HEIGHT = 7;
   const PIT_CEILING_Y = 14;
 
   return (
@@ -380,20 +379,6 @@ export function Dice({ onRollComplete, isRolling, targetResult, rollId = 0, dice
         targetValue={targetResult?.[1]}
         getNextRandom={seededRngRef.current}
       />
-
-      {/* Dice result display */}
-      {die1Value !== null && die2Value !== null && (
-        <group position={[0, 4, 0]}>
-          <Text
-            fontSize={1}
-            color="#00ffa3"
-            anchorX="center"
-            anchorY="middle"
-          >
-            {die1Value} + {die2Value} = {die1Value + die2Value}
-          </Text>
-        </group>
-      )}
     </group>
   );
 }

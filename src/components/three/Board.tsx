@@ -1,12 +1,12 @@
 'use client';
 
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Text, RoundedBox, Sparkles } from '@react-three/drei';
-import { RigidBody } from '@react-three/rapier';
+import { RigidBody, CuboidCollider } from '@react-three/rapier';
 import * as THREE from 'three';
 import { TILES, getTilePosition } from '@/lib/game/board-data';
-import { GROUP_COLORS, PropertyGroup, Tile, PropertyTile } from '@/lib/game/types';
+import { GROUP_COLORS, PropertyGroup, Tile, PropertyTile, Card } from '@/lib/game/types';
 import { useGameStore } from '@/lib/stores/game-store';
 
 // Board dimensions – square board: each side = 2*CORNER + 9*TILE_WIDTH = 25
@@ -43,6 +43,181 @@ function getShortName(tile: Tile): string {
     return name.split(' ').slice(0, 2).join(' ');
   }
   return name;
+}
+
+// Card pile – vertical stack (deck standing on table) for Chance / Community Chest
+const CARD_COUNT = 10;
+const CARD_THICKNESS = 0.06;
+const CARD_WIDTH = 2.2;
+const CARD_HEIGHT = 1.4;
+
+function CardPile({
+  color,
+  isChance,
+}: {
+  color: string;
+  isChance: boolean;
+}) {
+  return (
+    <group position={[0, 0.02, 0]}>
+      {Array.from({ length: CARD_COUNT }).map((_, i) => (
+        <mesh
+          key={i}
+          position={[
+            (i - (CARD_COUNT - 1) / 2) * 0.02,
+            i * CARD_THICKNESS,
+            (i - (CARD_COUNT - 1) / 2) * 0.02,
+          ]}
+          rotation={[0, 0, (i - (CARD_COUNT - 1) / 2) * 0.015]}
+        >
+          <boxGeometry args={[CARD_WIDTH, CARD_THICKNESS, CARD_HEIGHT]} />
+          <meshStandardMaterial
+            color={i === CARD_COUNT - 1 ? color : '#1a1a2a'}
+            metalness={0.2}
+            roughness={0.8}
+            emissive={i === CARD_COUNT - 1 ? color : undefined}
+            emissiveIntensity={i === CARD_COUNT - 1 ? 0.2 : 0}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+// Stack top Y in board space (card pile group y = BOARD_HEIGHT/2 + 0.02, top card at (CARD_COUNT-1)*CARD_THICKNESS)
+const STACK_TOP_Y = (BOARD_HEIGHT / 2 + 0.02) + (CARD_COUNT - 1) * CARD_THICKNESS;
+// Piles at opposite diagonal corners of the center (like real Monopoly)
+const CHANCE_STACK_POS: [number, number, number] = [-5, STACK_TOP_Y, -5];
+const CHEST_STACK_POS: [number, number, number] = [5, STACK_TOP_Y, 5];
+// Collider: pile base Y in world (same as card pile group), center Y = base + half stack height
+const PILE_BASE_Y = BOARD_HEIGHT / 2 + 0.02;
+const PILE_COLLIDER_HALF_Y = (CARD_COUNT * CARD_THICKNESS) / 2;
+const PILE_COLLIDER_CENTER_Y = PILE_BASE_Y + PILE_COLLIDER_HALF_Y;
+const DRAWN_CARD_DURATION = 0.6;
+const DISPLAY_POSITION: [number, number, number] = [0, 2, 0];
+
+/** Create a canvas texture with card color, title, and description for the drawn card front face */
+function useCardFaceTexture(title: string, description: string, color: string): THREE.CanvasTexture {
+  return useMemo(() => {
+    const w = 512;
+    const h = 320;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return new THREE.CanvasTexture(canvas);
+
+    // Slightly darker background for contrast, with thin border
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(2, 2, w - 4, h - 4);
+
+    const pad = 32;
+    let y = 44;
+
+    // Title – bold, larger, with black outline for readability
+    ctx.font = 'bold 32px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const titleWords = title.split(/\s+/);
+    const titleLines: string[] = [];
+    let line = '';
+    for (const word of titleWords) {
+      const next = line ? line + ' ' + word : word;
+      if (ctx.measureText(next).width <= w - pad * 2) line = next;
+      else {
+        if (line) titleLines.push(line);
+        line = word;
+      }
+    }
+    if (line) titleLines.push(line);
+    titleLines.forEach((l) => {
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 3;
+      ctx.strokeText(l, w / 2, y);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(l, w / 2, y);
+      y += 36;
+    });
+
+    y += 16;
+    ctx.font = '18px system-ui, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    const descWords = description.split(/\s+/);
+    let descLine = '';
+    for (const word of descWords) {
+      const next = descLine ? descLine + ' ' + word : word;
+      if (ctx.measureText(next).width <= w - pad * 2) descLine = next;
+      else {
+        if (descLine) {
+          ctx.strokeText(descLine, w / 2, y);
+          ctx.fillText(descLine, w / 2, y);
+          y += 22;
+        }
+        descLine = word;
+      }
+    }
+    if (descLine) {
+      ctx.strokeText(descLine, w / 2, y);
+      ctx.fillText(descLine, w / 2, y);
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }, [title, description, color]);
+}
+
+function DrawnCard({ card, cardType }: { card: Card; cardType: 'chance' | 'community-chest' }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const startTimeRef = useRef<number | null>(null);
+  const color = cardType === 'chance' ? '#ff6b35' : '#4ecdc4';
+  const faceTexture = useCardFaceTexture(card.title, card.description, color);
+  const startPos = cardType === 'chance' ? CHANCE_STACK_POS : CHEST_STACK_POS;
+
+  useFrame((state) => {
+    if (!groupRef.current) return;
+    const elapsed = state.clock.getElapsedTime();
+    if (startTimeRef.current === null) startTimeRef.current = elapsed;
+    const start = startTimeRef.current;
+    const t = Math.min(1, (elapsed - start) / DRAWN_CARD_DURATION);
+    const eased = 1 - (1 - t) * (1 - t); // ease out quad
+
+    groupRef.current.position.x = startPos[0] + (DISPLAY_POSITION[0] - startPos[0]) * eased;
+    groupRef.current.position.y = startPos[1] + (DISPLAY_POSITION[1] - startPos[1]) * eased;
+    groupRef.current.position.z = startPos[2] + (DISPLAY_POSITION[2] - startPos[2]) * eased;
+
+    groupRef.current.rotation.x = (-Math.PI / 2) * eased;
+  });
+
+  return (
+    <group ref={groupRef} position={[...startPos]}>
+      <mesh>
+        <boxGeometry args={[CARD_WIDTH, CARD_THICKNESS, CARD_HEIGHT]} />
+        <meshStandardMaterial
+          color={color}
+          metalness={0.2}
+          roughness={0.8}
+          emissive={color}
+          emissiveIntensity={0.25}
+        />
+      </mesh>
+      {/* Front face plane: on card’s -Y face so when card tilts -90° X it faces camera (+Z) */}
+      <mesh position={[0, -CARD_THICKNESS / 2, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[CARD_WIDTH, CARD_HEIGHT]} />
+        <meshStandardMaterial
+          map={faceTexture}
+          transparent={false}
+          side={THREE.FrontSide}
+          depthWrite={true}
+        />
+      </mesh>
+    </group>
+  );
 }
 
 interface TileComponentProps {
@@ -118,6 +293,20 @@ function TileComponent({ tile, index }: TileComponentProps) {
   const isCorner = [0, 10, 20, 30].includes(index);
   const tileColor = getTileColor(tile);
   const hasColorBand = tile.type === 'property';
+  // On side columns (left/right), inner edge is local +Z; on top/bottom rows it's local -Z
+  const isSideColumn = (index >= 11 && index <= 19) || (index >= 31 && index <= 39);
+  const colorBandZ = isSideColumn ? position.depth / 2 - 0.4 : -position.depth / 2 + 0.4;
+  const innerEdgeZ = isSideColumn ? position.depth / 2 - 0.8 : -position.depth / 2 + 0.8;
+
+  // Name and price go on the OUTER edge (away from color band). Inner is -Z for bottom/right, +Z for top/left.
+  const outerNameZ = isSideColumn ? -0.3 : isCorner ? 0 : 0.3;
+  const outerPriceZ = isSideColumn ? -position.depth / 2 + 0.5 : position.depth / 2 - 0.5;
+
+  // Text: lay flat and readable. Corners and horizontal rows (top/bottom) = unflipped flat; sides need Y flip.
+  const isHorizontalRow = position.rotation === 0 || position.rotation === Math.PI;
+  const textRotation: [number, number, number] = isCorner || isHorizontalRow
+    ? [-Math.PI / 2, 0, 0]
+    : [Math.PI / 2, Math.PI, 0];
 
   // Hover effect
   const [hovered, setHovered] = useState(false);
@@ -142,9 +331,9 @@ function TileComponent({ tile, index }: TileComponentProps) {
         />
       </mesh>
 
-      {/* Color band for properties */}
+      {/* Color band for properties – always on inner edge (toward board center) */}
       {hasColorBand && (
-        <mesh position={[0, 0.06, -position.depth / 2 + 0.4]}>
+        <mesh position={[0, 0.06, colorBandZ]}>
           <boxGeometry args={[position.width - 0.1, 0.05, 0.7]} />
           <meshStandardMaterial
             color={tileColor}
@@ -156,10 +345,10 @@ function TileComponent({ tile, index }: TileComponentProps) {
         </mesh>
       )}
 
-      {/* Tile name */}
+      {/* Tile name – on outer edge so not in color band */}
       <Text
-        position={[0, 0.12, isCorner ? 0 : 0.3]}
-        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.12, outerNameZ]}
+        rotation={textRotation}
         fontSize={isCorner ? 0.35 : 0.25}
         color="#ffffff"
         anchorX="center"
@@ -170,11 +359,11 @@ function TileComponent({ tile, index }: TileComponentProps) {
         {getShortName(tile)}
       </Text>
 
-      {/* Price for purchasable tiles */}
+      {/* Price for purchasable tiles – on outer edge, below name */}
       {'price' in tile && (
         <Text
-          position={[0, 0.12, position.depth / 2 - 0.5]}
-          rotation={[-Math.PI / 2, 0, 0]}
+          position={[0, 0.12, outerPriceZ]}
+          rotation={textRotation}
           fontSize={0.2}
           color="#00ffa3"
           anchorX="center"
@@ -208,7 +397,7 @@ function TileComponent({ tile, index }: TileComponentProps) {
 
       {/* Houses */}
       {propertyState && propertyState.houses > 0 && propertyState.houses < 5 && (
-        <group position={[0, 0.2, -position.depth / 2 + 0.8]}>
+        <group position={[0, 0.2, innerEdgeZ]}>
           {Array.from({ length: propertyState.houses }).map((_, i) => (
             <mesh
               key={i}
@@ -223,29 +412,80 @@ function TileComponent({ tile, index }: TileComponentProps) {
 
       {/* Hotel */}
       {propertyState && propertyState.houses === 5 && (
-        <mesh position={[0, 0.25, -position.depth / 2 + 0.8]}>
+        <mesh position={[0, 0.25, innerEdgeZ]}>
           <boxGeometry args={[0.6, 0.4, 0.4]} />
           <meshStandardMaterial color="#cc0000" />
         </mesh>
       )}
 
-      {/* Special tile decorations */}
-      {tile.type === 'go' && (
-        <Sparkles
-          count={20}
-          scale={[position.width, 1, position.depth]}
-          size={3}
-          speed={0.5}
-          color="#00ffa3"
-        />
+      {/* Big icon for corner tiles */}
+      {isCorner && (
+        <group position={[0, 0.18, outerNameZ * 0.5]}>
+          <Text
+            position={[0, 0, 0]}
+            rotation={textRotation}
+            fontSize={1.1}
+            color="#ffffff"
+            anchorX="center"
+            anchorY="middle"
+          >
+            {tile.type === 'go'
+              ? '₿'
+              : tile.type === 'jail'
+                ? '◉'
+                : tile.type === 'free-parking'
+                  ? 'P'
+                  : tile.type === 'go-to-jail'
+                    ? '!'
+                    : ''}
+          </Text>
+          {tile.type === 'go' && (
+            <Sparkles
+              count={20}
+              scale={[position.width, 1, position.depth]}
+              size={3}
+              speed={0.5}
+              color="#00ffa3"
+            />
+          )}
+        </group>
       )}
+
+      {/* Small icon for special non-corner tiles (at inner edge as badge) */}
+      {!isCorner &&
+        (tile.type === 'chance' || tile.type === 'community-chest' || tile.type === 'tax' || tile.type === 'railroad' || tile.type === 'utility') && (
+          <Text
+            position={[0, 0.14, innerEdgeZ + 0.2]}
+            rotation={textRotation}
+            fontSize={0.45}
+            color="#ffffff"
+            anchorX="center"
+            anchorY="middle"
+          >
+            {tile.type === 'chance'
+              ? '?'
+              : tile.type === 'community-chest'
+                ? '▣'
+                : tile.type === 'tax'
+                  ? '$'
+                  : tile.type === 'railroad'
+                    ? '◆'
+                    : tile.type === 'utility'
+                      ? '⚡'
+                      : ''}
+          </Text>
+        )}
+
     </group>
   );
 }
 
-import { useState } from 'react';
-
 export function Board() {
+  const gameState = useGameStore(state => state.gameState);
+  const drawnCard = gameState?.drawnCard ?? null;
+  const pendingAction = gameState?.pendingAction;
+  const showDrawnCard = drawnCard && pendingAction?.type === 'card-action';
+
   return (
     <group>
       {/* Main board base */}
@@ -269,6 +509,57 @@ export function Board() {
           roughness={0.8}
         />
       </mesh>
+
+      {/* Card pile colliders so dice collide with the stacks */}
+      <RigidBody type="fixed" position={[CHANCE_STACK_POS[0], PILE_COLLIDER_CENTER_Y, CHANCE_STACK_POS[2]]} friction={0.5} restitution={0.2}>
+        <CuboidCollider args={[CARD_WIDTH / 2, PILE_COLLIDER_HALF_Y, CARD_HEIGHT / 2]} />
+      </RigidBody>
+      <RigidBody type="fixed" position={[CHEST_STACK_POS[0], PILE_COLLIDER_CENTER_Y, CHEST_STACK_POS[2]]} friction={0.5} restitution={0.2}>
+        <CuboidCollider args={[CARD_WIDTH / 2, PILE_COLLIDER_HALF_Y, CARD_HEIGHT / 2]} />
+      </RigidBody>
+
+      {/* Two card piles at opposite diagonal corners of center (like real Monopoly) */}
+      <group position={[0, BOARD_HEIGHT / 2 + 0.02, 0]}>
+        <group position={[CHANCE_STACK_POS[0], 0, CHANCE_STACK_POS[2]]}>
+          <CardPile color="#ff6b35" isChance />
+          <Text
+            position={[0, 0.08, 1.8]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            fontSize={0.55}
+            color="#ffffff"
+            anchorX="center"
+            anchorY="middle"
+            maxWidth={3}
+            textAlign="center"
+            outlineWidth={0.02}
+            outlineColor="#000000"
+          >
+            Market Volatility
+          </Text>
+        </group>
+        <group position={[CHEST_STACK_POS[0], 0, CHEST_STACK_POS[2]]}>
+          <CardPile color="#4ecdc4" isChance={false} />
+          <Text
+            position={[0, 0.08, 1.8]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            fontSize={0.55}
+            color="#ffffff"
+            anchorX="center"
+            anchorY="middle"
+            maxWidth={3}
+            textAlign="center"
+            outlineWidth={0.02}
+            outlineColor="#000000"
+          >
+            Airdrop
+          </Text>
+        </group>
+      </group>
+
+      {/* Drawn card – animates from stack to center when a card is drawn */}
+      {showDrawnCard && drawnCard && (
+        <DrawnCard key={drawnCard.id} card={drawnCard} cardType={drawnCard.type} />
+      )}
 
       {/* Center logo */}
       <group position={[0, BOARD_HEIGHT / 2 + 0.1, 0]}>
@@ -331,9 +622,9 @@ export function Board() {
         </Text>
       </group>
 
-      {/* Board edge glow */}
-      <mesh position={[0, BOARD_HEIGHT / 2, 0]}>
-        <ringGeometry args={[BOARD_SIZE / 2 - 0.1, BOARD_SIZE / 2 + 0.1, 4]} />
+      {/* Board edge glow – circular ring (many segments so it’s round, not diamond) */}
+      <mesh position={[0, BOARD_HEIGHT / 2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[BOARD_SIZE / 2 - 0.1, BOARD_SIZE / 2 + 0.1, 64]} />
         <meshBasicMaterial
           color="#00ffa3"
           transparent

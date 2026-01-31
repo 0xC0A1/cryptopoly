@@ -68,16 +68,10 @@ export default function LobbyPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-8 overflow-auto">
-      {/* Background decoration */}
-      <div className="fixed inset-0 -z-10">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[var(--primary)] rounded-full blur-[150px] opacity-10" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[var(--secondary)] rounded-full blur-[150px] opacity-10" />
-      </div>
-
+    <div className="min-h-screen flex flex-col items-center justify-center p-8 overflow-auto bg-black">
       {/* Header */}
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-gradient mb-2">Game Lobby</h1>
+        <h1 className="text-3xl font-semibold text-white mb-2">Game Lobby</h1>
         <p className="text-white/60">Waiting for players to join...</p>
       </div>
 
@@ -85,7 +79,7 @@ export default function LobbyPage() {
       <div className="card mb-8 text-center">
         <div className="text-sm text-white/60 mb-2">Room Code</div>
         <div className="flex items-center justify-center gap-4">
-          <div className="text-4xl font-mono font-bold text-[var(--primary)] tracking-widest">
+          <div className="text-3xl font-semibold text-white tracking-widest">
             {roomId}
           </div>
           <button
@@ -95,7 +89,7 @@ export default function LobbyPage() {
             {copied ? 'Copied!' : 'Copy'}
           </button>
         </div>
-        <p className="text-sm text-white/40 mt-2">
+        <p className="text-sm text-white/50 mt-2">
           Share this code with friends to join the game
         </p>
       </div>
@@ -103,7 +97,7 @@ export default function LobbyPage() {
       <div className="grid md:grid-cols-2 gap-8 w-full max-w-4xl">
         {/* Token Selection */}
         <div className="card">
-          <h2 className="text-xl font-bold text-white mb-4">Choose Your Token</h2>
+          <h2 className="text-lg font-semibold text-white mb-4">Choose Your Token</h2>
           <p className="text-sm text-white/50 mb-3">
             Pick a token; others will see which are taken.
           </p>
@@ -119,12 +113,12 @@ export default function LobbyPage() {
                   onClick={() => !isTaken && selectToken(token)}
                   disabled={isTaken}
                   className={cn(
-                    'p-4 rounded-xl transition-all duration-200',
+                    'p-4 rounded-lg transition-colors duration-150',
                     'flex flex-col items-center gap-2',
-                    'border-2',
+                    'border',
                     isSelected
-                      ? 'border-[var(--primary)] bg-[var(--primary)]/20'
-                      : 'border-white/10 bg-white/5 hover:border-white/30',
+                      ? 'border-white bg-white/10'
+                      : 'border-white/20 bg-black hover:border-white/40',
                     isTaken && 'opacity-50 cursor-not-allowed'
                   )}
                 >
@@ -139,7 +133,7 @@ export default function LobbyPage() {
                     <span className="text-xs text-white/50">Taken by {takenBy.name}</span>
                   )}
                   {isSelected && (
-                    <span className="text-xs text-[var(--primary)]">You</span>
+                    <span className="text-xs text-white/80">You</span>
                   )}
                 </button>
               );
@@ -149,14 +143,14 @@ export default function LobbyPage() {
 
         {/* Players List */}
         <div className="card">
-          <h2 className="text-xl font-bold text-white mb-4">
+          <h2 className="text-lg font-semibold text-white mb-4">
             Players ({players.length}/6)
           </h2>
           <div className="space-y-3">
             {players.map((player, index) => (
               <div
                 key={player.id}
-                className="flex items-center gap-3 p-3 rounded-xl bg-white/5"
+                className="flex items-center gap-3 p-3 rounded-lg border border-white/10"
               >
                 <div
                   className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
@@ -165,10 +159,10 @@ export default function LobbyPage() {
                   {TOKEN_SYMBOLS[player.token]}
                 </div>
                 <div className="flex-1">
-                  <div className="font-semibold text-white">
+                  <div className="font-medium text-white">
                     {player.name}
                     {player.id === gameState?.hostId && (
-                      <span className="ml-2 text-xs text-[var(--accent)]">Host</span>
+                      <span className="ml-2 text-xs text-white/60">Host</span>
                     )}
                   </div>
                   <div className="text-sm text-white/60">
@@ -176,7 +170,7 @@ export default function LobbyPage() {
                   </div>
                 </div>
                 {index === 0 && (
-                  <div className="text-xs text-[var(--primary)] px-2 py-1 bg-[var(--primary)]/10 rounded">
+                  <div className="text-xs text-white/70 px-2 py-1 border border-white/20 rounded">
                     #1
                   </div>
                 )}
@@ -187,12 +181,12 @@ export default function LobbyPage() {
             {Array.from({ length: 6 - players.length }).map((_, i) => (
               <div
                 key={`empty-${i}`}
-                className="flex items-center gap-3 p-3 rounded-xl border-2 border-dashed border-white/10"
+                className="flex items-center gap-3 p-3 rounded-lg border border-dashed border-white/20"
               >
-                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-                  <span className="text-white/20">?</span>
+                <div className="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center">
+                  <span className="text-white/30">?</span>
                 </div>
-                <div className="text-white/30">Waiting for player...</div>
+                <div className="text-white/40 text-sm">Waiting for player...</div>
               </div>
             ))}
           </div>
@@ -220,7 +214,7 @@ export default function LobbyPage() {
       )}
 
       {!isHost && (
-        <div className="mt-8 text-white/60">
+        <div className="mt-8 text-white/60 text-sm">
           Waiting for host to start the game...
         </div>
       )}
@@ -231,7 +225,7 @@ export default function LobbyPage() {
           useGameStore.getState().reset();
           router.push('/');
         }}
-        className="mt-4 text-white/40 hover:text-white/60 transition-colors"
+        className="mt-4 text-sm text-white/50 hover:text-white/70 transition-colors"
       >
         Leave Lobby
       </button>

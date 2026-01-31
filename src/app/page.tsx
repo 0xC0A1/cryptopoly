@@ -57,32 +57,15 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-8 overflow-auto">
-      {/* Background decoration */}
-      <div className="fixed inset-0 -z-10">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[var(--primary)] rounded-full blur-[150px] opacity-10" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[var(--secondary)] rounded-full blur-[150px] opacity-10" />
-        <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-[var(--accent)] rounded-full blur-[100px] opacity-10" />
-      </div>
-
+    <div className="min-h-screen flex flex-col items-center justify-center p-8 overflow-auto bg-black">
       {/* Logo */}
       <div className="text-center mb-12">
-        <h1 className="text-6xl md:text-8xl font-bold text-gradient mb-4">
+        <h1 className="text-5xl md:text-7xl font-bold text-white mb-4 tracking-tight">
           CRYPTOPOLY
         </h1>
-        <p className="text-xl text-white/60">
+        <p className="text-lg text-white/70">
           The Crypto Trading Game
         </p>
-      </div>
-
-      {/* Crypto symbols decoration */}
-      <div className="flex gap-8 mb-12 text-4xl">
-        <span className="text-[#f7931a]">₿</span>
-        <span className="text-[#627eea]">Ξ</span>
-        <span className="text-[#00ffa3]">◎</span>
-        <span className="text-[#c2a633]">Ð</span>
-        <span className="text-[#0033ad]">A</span>
-        <span className="text-[#e6007a]">●</span>
       </div>
 
       {/* Menu */}
@@ -106,9 +89,9 @@ export default function Home() {
 
         {mode === 'create' && (
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-white mb-4">Create New Game</h2>
+            <h2 className="text-xl font-semibold text-white mb-4">Create New Game</h2>
             <div>
-              <label className="block text-sm text-white/60 mb-1">Your Name</label>
+              <label className="block text-sm text-white/70 mb-1">Your Name</label>
               <input
                 type="text"
                 value={playerName}
@@ -121,7 +104,7 @@ export default function Home() {
                 maxLength={20}
               />
             </div>
-            {error && <p className="text-red-400 text-sm">{error}</p>}
+            {error && <p className="text-white/80 text-sm">{error}</p>}
             <div className="flex gap-3">
               <button
                 onClick={() => setMode('menu')}
@@ -141,9 +124,9 @@ export default function Home() {
 
         {mode === 'join' && (
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-white mb-4">Join Game</h2>
+            <h2 className="text-xl font-semibold text-white mb-4">Join Game</h2>
             <div>
-              <label className="block text-sm text-white/60 mb-1">Your Name</label>
+              <label className="block text-sm text-white/70 mb-1">Your Name</label>
               <input
                 type="text"
                 value={playerName}
@@ -157,7 +140,7 @@ export default function Home() {
               />
             </div>
             <div>
-              <label className="block text-sm text-white/60 mb-1">Room Code</label>
+              <label className="block text-sm text-white/70 mb-1">Room Code</label>
               <input
                 type="text"
                 value={roomCode}
@@ -166,11 +149,11 @@ export default function Home() {
                   setError('');
                 }}
                 placeholder="Enter 6-character code"
-                className="w-full text-center text-2xl tracking-widest font-mono"
+                className="w-full text-center text-2xl tracking-widest"
                 maxLength={6}
               />
             </div>
-            {error && <p className="text-red-400 text-sm">{error}</p>}
+            {error && <p className="text-white/80 text-sm">{error}</p>}
             <div className="flex gap-3">
               <button
                 onClick={() => setMode('menu')}
@@ -192,25 +175,22 @@ export default function Home() {
       {/* Features */}
       <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl">
         <div className="text-center">
-          <div className="text-3xl mb-2">🎮</div>
-          <h3 className="text-lg font-semibold text-white mb-1">Multiplayer</h3>
+          <h3 className="text-base font-medium text-white mb-1">Multiplayer</h3>
           <p className="text-sm text-white/60">Play with 2-6 friends via P2P connection</p>
         </div>
         <div className="text-center">
-          <div className="text-3xl mb-2">🌐</div>
-          <h3 className="text-lg font-semibold text-white mb-1">3D Board</h3>
-          <p className="text-sm text-white/60">Beautiful 3D rendered game board</p>
+          <h3 className="text-base font-medium text-white mb-1">3D Board</h3>
+          <p className="text-sm text-white/60">3D rendered game board</p>
         </div>
         <div className="text-center">
-          <div className="text-3xl mb-2">💰</div>
-          <h3 className="text-lg font-semibold text-white mb-1">Crypto Themed</h3>
+          <h3 className="text-base font-medium text-white mb-1">Crypto Themed</h3>
           <p className="text-sm text-white/60">Properties named after real cryptocurrencies</p>
         </div>
       </div>
 
       {/* Footer */}
-      <div className="mt-12 text-center text-white/40 text-sm">
-        Built with Next.js, React Three Fiber & WebRTC
+      <div className="mt-12 text-center text-white/50 text-sm">
+        Next.js · React Three Fiber · WebRTC
       </div>
     </div>
   );

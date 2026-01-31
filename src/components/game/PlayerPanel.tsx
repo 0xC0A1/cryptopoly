@@ -19,10 +19,11 @@ function PlayerCard({ player, isCurrentPlayer, isLocalPlayer }: PlayerCardProps)
   return (
     <div
       className={cn(
-        'p-3 rounded-xl transition-all duration-300',
-        'bg-white/5 border border-white/10',
-        isCurrentPlayer && 'border-[var(--primary)] glow-primary',
-        isLocalPlayer && 'bg-white/10',
+        'p-3 rounded-lg transition-colors duration-150',
+        'border',
+        isCurrentPlayer && 'border-white bg-white/5',
+        !isCurrentPlayer && 'border-white/20 bg-black',
+        isLocalPlayer && 'bg-white/5',
         player.isBankrupt && 'opacity-50'
       )}
     >
@@ -45,17 +46,17 @@ function PlayerCard({ player, isCurrentPlayer, isLocalPlayer }: PlayerCardProps)
         {/* Player info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-white truncate">
+            <span className="font-medium text-white truncate text-sm">
               {player.name}
             </span>
             {isLocalPlayer && (
-              <span className="text-xs text-[var(--primary)]">(You)</span>
+              <span className="text-xs text-white/70">(You)</span>
             )}
             {isCurrentPlayer && (
-              <span className="w-2 h-2 rounded-full bg-[var(--primary)] animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-white" />
             )}
           </div>
-          <div className="text-sm text-[var(--primary)] font-mono">
+          <div className="text-xs text-white/70 font-medium">
             ${player.money.toLocaleString()}
           </div>
         </div>
@@ -63,18 +64,18 @@ function PlayerCard({ player, isCurrentPlayer, isLocalPlayer }: PlayerCardProps)
         {/* Status indicators */}
         <div className="flex flex-col items-end gap-1">
           {player.inJail && (
-            <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400">
+            <span className="text-xs px-2 py-0.5 rounded border border-white/30 text-white/80">
               In Jail
             </span>
           )}
           {player.isBankrupt && (
-            <span className="text-xs px-2 py-0.5 rounded bg-gray-500/20 text-gray-400">
+            <span className="text-xs px-2 py-0.5 rounded border border-white/20 text-white/50">
               Bankrupt
             </span>
           )}
           {player.properties.length > 0 && (
-            <span className="text-xs text-white/60">
-              {player.properties.length} properties
+            <span className="text-xs text-white/50">
+              {player.properties.length} props
             </span>
           )}
         </div>
@@ -94,10 +95,10 @@ export function PlayerPanel() {
   if (!gameState || gameState.phase === 'lobby') return null;
 
   return (
-    <div className="glass rounded-2xl p-4 w-64">
-      <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-        <span className="text-[var(--primary)]">Players</span>
-        <span className="text-sm text-white/40">({players.length})</span>
+    <div className="rounded-lg border border-white/20 bg-black/90 p-4 w-64">
+      <h2 className="text-base font-semibold text-white mb-3 flex items-center gap-2">
+        Players
+        <span className="text-xs text-white/50 font-normal">({players.length})</span>
       </h2>
 
       <div className="space-y-2">
@@ -113,9 +114,9 @@ export function PlayerPanel() {
 
       {/* Free Parking Money */}
       {gameState.freeParking > 0 && (
-        <div className="mt-4 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/30">
-          <div className="text-sm text-yellow-400">Free Parking</div>
-          <div className="text-lg font-bold text-yellow-500">
+        <div className="mt-4 p-3 rounded-lg border border-white/20">
+          <div className="text-xs text-white/60">Free Parking</div>
+          <div className="text-base font-semibold text-white">
             ${gameState.freeParking.toLocaleString()}
           </div>
         </div>

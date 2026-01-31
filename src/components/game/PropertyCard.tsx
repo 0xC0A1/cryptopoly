@@ -23,38 +23,38 @@ export function PropertyCard() {
   return (
     <div className="modal-overlay" onClick={() => setShowPropertyCard(null)}>
       <div
-        className="glass rounded-2xl p-6 w-80 max-w-[90vw]"
+        className="rounded-lg border border-white/20 bg-black p-6 w-80 max-w-[90vw]"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header with color band */}
+        {/* Header with color band (property group color is game data) */}
         {tile.type === 'property' && (
           <div
-            className="h-20 -m-6 mb-4 rounded-t-2xl flex items-end p-4"
+            className="h-16 -m-6 mb-4 rounded-t-lg flex items-end p-4 border-b border-white/10"
             style={{ backgroundColor: GROUP_COLORS[(tile as PropertyTile).group] }}
           >
             <div className="text-white">
-              <div className="text-xs opacity-80">
+              <div className="text-xs opacity-90">
                 {GROUP_NAMES[(tile as PropertyTile).group]}
               </div>
-              <div className="text-xl font-bold">{tile.name}</div>
+              <div className="text-lg font-semibold">{tile.name}</div>
             </div>
           </div>
         )}
 
         {tile.type !== 'property' && (
-          <div className="text-xl font-bold text-white mb-4">{tile.name}</div>
+          <div className="text-lg font-semibold text-white mb-4 border-b border-white/10 pb-2">{tile.name}</div>
         )}
 
         {/* Ownership */}
         {owner && (
-          <div className="mb-4 p-3 rounded-xl bg-white/5 flex items-center gap-3">
+          <div className="mb-4 p-3 rounded-lg border border-white/10 flex items-center gap-3">
             <div
               className="w-8 h-8 rounded-full"
               style={{ backgroundColor: TOKEN_COLORS[owner.token] }}
             />
             <div>
-              <div className="text-xs text-white/60">Owned by</div>
-              <div className="font-semibold text-white">{owner.name}</div>
+              <div className="text-xs text-white/50">Owned by</div>
+              <div className="font-medium text-white text-sm">{owner.name}</div>
             </div>
           </div>
         )}
@@ -67,7 +67,7 @@ export function PropertyCard() {
               <span className="text-white font-mono">${(tile as PropertyTile).price}</span>
             </div>
             <div className="border-t border-white/10 pt-2 mt-2">
-              <div className="text-xs text-white/40 mb-1">RENT</div>
+              <div className="text-xs text-white/50 mb-1">RENT</div>
               <div className="flex justify-between">
                 <span className="text-white/60">Base</span>
                 <span className="text-white font-mono">${(tile as PropertyTile).rent[0]}</span>
@@ -114,7 +114,7 @@ export function PropertyCard() {
               <span className="text-white font-mono">${(tile as RailroadTile).price}</span>
             </div>
             <div className="border-t border-white/10 pt-2 mt-2">
-              <div className="text-xs text-white/40 mb-1">RENT</div>
+              <div className="text-xs text-white/50 mb-1">RENT</div>
               <div className="flex justify-between">
                 <span className="text-white/60">1 Exchange owned</span>
                 <span className="text-white font-mono">${(tile as RailroadTile).rent[0]}</span>
@@ -143,7 +143,7 @@ export function PropertyCard() {
               <span className="text-white font-mono">${(tile as UtilityTile).price}</span>
             </div>
             <div className="border-t border-white/10 pt-2 mt-2">
-              <div className="text-xs text-white/40 mb-1">RENT</div>
+              <div className="text-xs text-white/50 mb-1">RENT</div>
               <div className="text-white/60 text-xs">
                 If 1 utility is owned, rent is 4 times the dice roll.
                 <br />
@@ -155,15 +155,15 @@ export function PropertyCard() {
 
         {/* Houses indicator */}
         {propertyState && propertyState.houses > 0 && (
-          <div className="mt-4 p-3 rounded-xl bg-white/5">
-            <div className="text-xs text-white/40 mb-1">BUILDINGS</div>
+          <div className="mt-4 p-3 rounded-lg border border-white/10">
+            <div className="text-xs text-white/50 mb-1">BUILDINGS</div>
             <div className="flex gap-1">
               {propertyState.houses < 5 ? (
                 Array.from({ length: propertyState.houses }).map((_, i) => (
-                  <div key={i} className="w-6 h-6 bg-green-500 rounded" />
+                  <div key={i} className="w-6 h-6 bg-white/20 rounded" />
                 ))
               ) : (
-                <div className="px-3 py-1 bg-red-500 rounded text-white text-sm">
+                <div className="px-3 py-1 border border-white/30 rounded text-white text-sm">
                   Hotel
                 </div>
               )}
@@ -173,7 +173,7 @@ export function PropertyCard() {
 
         {/* Mortgaged indicator */}
         {propertyState?.isMortgaged && (
-          <div className="mt-4 p-3 rounded-xl bg-red-500/20 text-red-400 text-center">
+          <div className="mt-4 p-3 rounded-lg border border-white/30 text-white/80 text-center text-sm">
             MORTGAGED
           </div>
         )}
