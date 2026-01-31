@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useGameStore } from '@/lib/stores/game-store';
 import { getCurrentPlayer } from '@/lib/game/engine';
 import { TILES } from '@/lib/game/board-data';
+import { CHANCE_DECK_NAME, COMMUNITY_CHEST_DECK_NAME } from '@/lib/game/constants';
 import { cn } from '@/lib/utils';
 
 export function ActionPanel() {
@@ -184,7 +185,7 @@ export function ActionPanel() {
           {pendingAction?.type === 'draw-card' && isMyTurn && (
             <div className="p-3 rounded-lg border border-white/30">
               <div className="text-sm text-white/80 mb-2">
-                {pendingAction.cardType === 'chance' ? 'Market Volatility' : 'Airdrop'}
+                {pendingAction.cardType === 'chance' ? CHANCE_DECK_NAME : COMMUNITY_CHEST_DECK_NAME}
               </div>
               <button
                 onClick={drawCard}

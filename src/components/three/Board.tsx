@@ -6,6 +6,7 @@ import { Text, RoundedBox, Sparkles } from '@react-three/drei';
 import { RigidBody, CuboidCollider } from '@react-three/rapier';
 import * as THREE from 'three';
 import { TILES, getTilePosition } from '@/lib/game/board-data';
+import { GAME_NAME, CHANCE_DECK_NAME, COMMUNITY_CHEST_DECK_NAME } from '@/lib/game/constants';
 import { GROUP_COLORS, PropertyGroup, Tile, PropertyTile, Card } from '@/lib/game/types';
 import { useGameStore } from '@/lib/stores/game-store';
 
@@ -373,6 +374,20 @@ function TileComponent({ tile, index }: TileComponentProps) {
         </Text>
       )}
 
+      {/* Tax/penalty amount for tax tiles – on outer edge, below name */}
+      {tile.type === 'tax' && 'amount' in tile && (
+        <Text
+          position={[0, 0.12, outerPriceZ]}
+          rotation={textRotation}
+          fontSize={0.2}
+          color="#ff8888"
+          anchorX="center"
+          anchorY="middle"
+        >
+          -${tile.amount}
+        </Text>
+      )}
+
       {/* Owner indicator */}
       {owner && (
         <mesh position={[position.width / 2 - 0.3, 0.15, position.depth / 2 - 0.3]}>
@@ -534,7 +549,7 @@ export function Board() {
             outlineWidth={0.02}
             outlineColor="#000000"
           >
-            Market Volatility
+            {CHANCE_DECK_NAME}
           </Text>
         </group>
         <group position={[CHEST_STACK_POS[0], 0, CHEST_STACK_POS[2]]}>
@@ -551,7 +566,7 @@ export function Board() {
             outlineWidth={0.02}
             outlineColor="#000000"
           >
-            Airdrop
+            {COMMUNITY_CHEST_DECK_NAME}
           </Text>
         </group>
       </group>
@@ -570,7 +585,7 @@ export function Board() {
           anchorY="middle"
           rotation={[-Math.PI / 2, 0, 0]}
         >
-          CRYPTOPOLY
+          {GAME_NAME.toUpperCase()}
         </Text>
         <Text
           position={[0, 0, 1.5]}

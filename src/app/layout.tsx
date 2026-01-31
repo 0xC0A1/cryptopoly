@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import { GameConnectionProvider } from "@/components/GameConnectionProvider";
+import { GAME_NAME, GAME_TAGLINE } from "@/lib/game/constants";
 
 const poppins = Poppins({
   variable: "--font-poppins",
@@ -10,8 +11,8 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Cryptopoly - The Crypto Trading Game",
-  description: "A crypto-themed Monopoly game with multiplayer support",
+  title: `${GAME_NAME} - ${GAME_TAGLINE}`,
+  description: `A crypto-themed Monopoly game with multiplayer support`,
   keywords: ["monopoly", "crypto", "game", "multiplayer", "bitcoin", "ethereum"],
 };
 

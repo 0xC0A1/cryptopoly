@@ -3,6 +3,7 @@
 // ============================================
 
 import type { PropertyGroup } from '../types';
+import { RAILROAD_TILE_INDICES, UTILITY_TILE_INDICES } from '../constants';
 import { TILES } from './tiles';
 
 export function getPropertyTiles() {
@@ -22,19 +23,17 @@ export function getUtilityTiles() {
 }
 
 export function getNextRailroadIndex(fromIndex: number): number {
-  const railroads = [5, 15, 25, 35];
-  for (const rr of railroads) {
+  for (const rr of RAILROAD_TILE_INDICES) {
     if (rr > fromIndex) return rr;
   }
-  return railroads[0];
+  return RAILROAD_TILE_INDICES[0];
 }
 
 export function getNextUtilityIndex(fromIndex: number): number {
-  const utilities = [12, 28];
-  for (const util of utilities) {
+  for (const util of UTILITY_TILE_INDICES) {
     if (util > fromIndex) return util;
   }
-  return utilities[0];
+  return UTILITY_TILE_INDICES[0];
 }
 
 export function shuffleArray<T>(array: T[]): T[] {

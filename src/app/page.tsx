@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameStore } from '@/lib/stores/game-store';
+import { GAME_NAME, GAME_TAGLINE } from '@/lib/game/constants';
 
 export default function Home() {
   const router = useRouter();
@@ -61,10 +62,10 @@ export default function Home() {
       {/* Logo */}
       <div className="text-center mb-12">
         <h1 className="text-5xl md:text-7xl font-bold text-white mb-4 tracking-tight">
-          CRYPTOPOLY
+          {GAME_NAME.toUpperCase()}
         </h1>
         <p className="text-lg text-white/70">
-          The Crypto Trading Game
+          {GAME_TAGLINE}
         </p>
       </div>
 

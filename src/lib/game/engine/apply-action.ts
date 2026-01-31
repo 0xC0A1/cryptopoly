@@ -4,7 +4,14 @@
 
 import type { GameState, GameAction, PropertyTile, TokenType } from '../types';
 import { TILES, shuffleArray } from '../board-data';
-import { JAIL_FINE, JAIL_INDEX } from './constants';
+import {
+  JAIL_FINE,
+  JAIL_INDEX,
+  AVAILABLE_TOKENS,
+  DEFAULT_TOKEN,
+  UNMORTGAGE_MULTIPLIER,
+  HOUSE_SELL_BACK_RATIO,
+} from './constants';
 import { createPlayer } from './state';
 import { getCurrentPlayer, getNextPlayerIndex } from './players';
 import { executeCardAction } from './tiles';
@@ -27,8 +34,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
         break;
       }
       const existingTokens = Object.values(newState.players).map(p => p.token);
-      const availableTokens: TokenType[] = ['bitcoin', 'ethereum', 'solana', 'dogecoin', 'cardano', 'polkadot'];
-      const defaultToken = availableTokens.find(t => !existingTokens.includes(t)) || 'bitcoin';
+      const defaultToken = AVAILABLE_TOKENS.find(t => !existingTokens.includes(t)) ?? DEFAULT_TOKEN;
 
       newState.players = {
         ...newState.players,
@@ -242,7 +248,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
 
       newState.players = {
         ...newState.players,
-        [action.playerId]: { ...player, money: player.money + Math.floor(tile.houseCost / 2) },
+        [action.playerId]: { ...player, money: player.money + Math.floor(tile.houseCost * HOUSE_SELL_BACK_RATIO) },
       };
       newState.properties = {
         ...newState.properties,
@@ -285,7 +291,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       if (!propertyState.isMortgaged) break;
 
       const mortgage = 'mortgage' in tile ? tile.mortgage : 0;
-      const unmortgageCost = Math.floor(mortgage * 1.1);
+      const unmortgageCost = Math.floor(mortgage * UNMORTGAGE_MULTIPLIER);
 
       if (!canAfford(player, unmortgageCost)) break;
 

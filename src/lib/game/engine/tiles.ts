@@ -4,7 +4,7 @@
 
 import type { GameState, Tile, Card } from '../types';
 import { TILES, getNextRailroadIndex, getNextUtilityIndex } from '../board-data';
-import { GO_SALARY, JAIL_INDEX } from './constants';
+import { GO_SALARY, JAIL_INDEX, BOARD_SIZE } from './constants';
 import { calculateRent } from './rent';
 
 export function handleLandOnTile(state: GameState, playerId: string, tile: Tile): void {
@@ -158,7 +158,7 @@ export function executeCardAction(state: GameState, playerId: string, card: Card
 
     case 'move-back': {
       let newPosition = player.position - action.spaces;
-      if (newPosition < 0) newPosition += 40;
+      if (newPosition < 0) newPosition += BOARD_SIZE;
 
       state.players[playerId] = {
         ...player,

@@ -4,6 +4,12 @@
 
 import type { GameState, Tile, PropertyTile, RailroadTile, UtilityTile } from '../types';
 import { getTilesByGroup } from '../board-data';
+import {
+  RAILROAD_TILE_INDICES,
+  UTILITY_TILE_INDICES,
+  UTILITY_RENT_1_MULTIPLIER,
+  UTILITY_RENT_2_MULTIPLIER,
+} from './constants';
 import { getDiceTotal } from './dice';
 
 export function calculateRent(
@@ -39,8 +45,7 @@ export function calculateRent(
     const rrTile = tile as RailroadTile;
     const ownerId = propertyState.ownerId;
 
-    const railroads = [5, 15, 25, 35];
-    const ownedCount = railroads.filter(
+    const ownedCount = RAILROAD_TILE_INDICES.filter(
       idx => state.properties[idx]?.ownerId === ownerId
     ).length;
 
@@ -50,18 +55,17 @@ export function calculateRent(
   if (tile.type === 'utility') {
     const ownerId = propertyState.ownerId;
 
-    const utilities = [12, 28];
-    const ownedCount = utilities.filter(
+    const ownedCount = UTILITY_TILE_INDICES.filter(
       idx => state.properties[idx]?.ownerId === ownerId
     ).length;
 
     const diceTotal = diceRoll ? getDiceTotal(diceRoll) : 7;
 
     if (ownedCount === 1) {
-      return diceTotal * 4;
+      return diceTotal * UTILITY_RENT_1_MULTIPLIER;
     }
     if (ownedCount === 2) {
-      return diceTotal * 10;
+      return diceTotal * UTILITY_RENT_2_MULTIPLIER;
     }
   }
 

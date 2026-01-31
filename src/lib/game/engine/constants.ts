@@ -1,11 +1,23 @@
 // ============================================
-// CRYPTOPOLY - Game constants
+// CRYPTOPOLY - Engine constants (re-export from main)
 // ============================================
+// All tunable values live in ../constants.ts — edit that file to tweak the game.
 
-export const STARTING_MONEY = 1500;
-export const GO_SALARY = 200;
-export const JAIL_FINE = 50;
-export const MAX_JAIL_TURNS = 3;
-export const MAX_DOUBLES = 3;
-export const JAIL_INDEX = 10;
-export const GO_TO_JAIL_INDEX = 30;
+export {
+  STARTING_MONEY,
+  GO_SALARY,
+  JAIL_FINE,
+  MAX_JAIL_TURNS,
+  MAX_DOUBLES,
+  JAIL_INDEX,
+  GO_TO_JAIL_INDEX,
+  BOARD_SIZE,
+  RAILROAD_TILE_INDICES,
+  UTILITY_TILE_INDICES,
+  UNMORTGAGE_MULTIPLIER,
+  HOUSE_SELL_BACK_RATIO,
+  UTILITY_RENT_1_MULTIPLIER,
+  UTILITY_RENT_2_MULTIPLIER,
+  AVAILABLE_TOKENS,
+  DEFAULT_TOKEN,
+} from '../constants';

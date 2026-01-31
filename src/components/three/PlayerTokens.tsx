@@ -8,6 +8,8 @@ import { useGameStore } from '@/lib/stores/game-store';
 import { TOKEN_COLORS, TokenType, Player } from '@/lib/game/types';
 import { TILES } from '@/lib/game/board-data';
 
+const TILE_COUNT = 40;
+
 // Board dimensions (must match Board.tsx)
 const BOARD_SIZE = 25;
 const TILE_WIDTH = 2;
@@ -38,6 +40,18 @@ function getTilePosition3D(index: number): THREE.Vector3 {
   }
 }
 
+// Path from fromTile to toTile stepping forward one tile at a time (wrapping at 40)
+function getPath(fromTile: number, toTile: number): number[] {
+  if (fromTile === toTile) return [];
+  const path: number[] = [];
+  let steps = (toTile - fromTile + TILE_COUNT) % TILE_COUNT;
+  if (steps === 0) return [];
+  for (let i = 1; i <= steps; i++) {
+    path.push((fromTile + i) % TILE_COUNT);
+  }
+  return path;
+}
+
 // Offset tokens so they don't overlap on same tile
 function getTokenOffset(playerIndex: number, totalPlayers: number): THREE.Vector3 {
   const offsets: THREE.Vector3[] = [
@@ -58,37 +72,75 @@ interface PlayerTokenProps {
   isCurrentPlayer: boolean;
 }
 
+// How fast the token moves along the path (world units per second)
+const MOVE_SPEED = 8;
+// Height of the little jump when moving between tiles
+const JUMP_HEIGHT = 0.35;
+
 function PlayerToken({ player, playerIndex, totalPlayers, isCurrentPlayer }: PlayerTokenProps) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const [currentPos, setCurrentPos] = useState<THREE.Vector3>(() => getTilePosition3D(player.position));
-  const [targetPos, setTargetPos] = useState<THREE.Vector3>(() => getTilePosition3D(player.position));
-  const [isAnimating, setIsAnimating] = useState(false);
+  const previousTileRef = useRef<number>(player.position);
+  const [currentPos, setCurrentPos] = useState<THREE.Vector3>(() => {
+    const base = getTilePosition3D(player.position);
+    const off = getTokenOffset(playerIndex, totalPlayers);
+    return base.add(off);
+  });
+  // Path of tile indices we're still animating through (one tile at a time)
+  const [path, setPath] = useState<number[]>([]);
+  const pathIndexRef = useRef(0);
+  const segmentStartDistRef = useRef(0);
 
   const color = TOKEN_COLORS[player.token];
+  const offset = useMemo(() => getTokenOffset(playerIndex, totalPlayers), [playerIndex, totalPlayers]);
 
-  // Update target position when player moves (offset computed inside effect so deps are stable primitives)
+  // When player.position changes, build path from previous tile to new tile and animate through it
   useEffect(() => {
-    const offset = getTokenOffset(playerIndex, totalPlayers);
-    const newTarget = getTilePosition3D(player.position).add(offset);
-    setTargetPos(newTarget);
-    if (!currentPos.equals(newTarget)) {
-      setIsAnimating(true);
-    }
-  }, [player.position, playerIndex, totalPlayers]);
+    const prev = previousTileRef.current;
+    const next = player.position;
+    if (prev === next) return;
 
-  // Animate movement
+    const newPath = getPath(prev, next);
+    previousTileRef.current = next;
+    pathIndexRef.current = 0;
+    segmentStartDistRef.current = 0;
+    if (newPath.length > 0) {
+      setPath(newPath);
+    }
+  }, [player.position]);
+
+  // Animate movement along path: move tile-by-tile over the board with a small jump per tile
   useFrame((_, delta) => {
-    if (!isAnimating) return;
+    if (path.length === 0) return;
 
-    const speed = 8;
-    const newPos = currentPos.clone().lerp(targetPos, Math.min(1, delta * speed));
+    const tileIndex = path[pathIndexRef.current];
+    const baseTarget = getTilePosition3D(tileIndex).add(offset);
+    const dist = currentPos.distanceTo(baseTarget);
 
-    if (newPos.distanceTo(targetPos) < 0.01) {
-      setCurrentPos(targetPos.clone());
-      setIsAnimating(false);
-    } else {
-      setCurrentPos(newPos);
+    // Lazy-init segment distance at start of each segment
+    if (segmentStartDistRef.current <= 0) {
+      segmentStartDistRef.current = Math.max(0.01, currentPos.distanceTo(baseTarget));
     }
+
+    if (dist < 0.02) {
+      // Reached this tile; advance to next in path
+      setCurrentPos(baseTarget.clone());
+      pathIndexRef.current += 1;
+      segmentStartDistRef.current = 0;
+      if (pathIndexRef.current >= path.length) {
+        setPath([]);
+      }
+      return;
+    }
+
+    const step = Math.min(1, (delta * MOVE_SPEED) / Math.max(0.01, dist));
+    const newPos = currentPos.clone().lerp(baseTarget, step);
+
+    // Parabolic jump over this segment: 0 at start, peak at middle, 0 at end
+    const segmentProgress = 1 - newPos.distanceTo(baseTarget) / segmentStartDistRef.current;
+    const jumpY = Math.sin(Math.max(0, Math.min(1, segmentProgress)) * Math.PI) * JUMP_HEIGHT;
+    newPos.y = getTilePosition3D(tileIndex).y + jumpY;
+
+    setCurrentPos(newPos);
   });
 
   // Rotate current player token

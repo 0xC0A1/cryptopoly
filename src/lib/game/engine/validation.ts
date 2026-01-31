@@ -4,6 +4,7 @@
 
 import type { GameState, Player, PropertyTile, PropertyGroup, RailroadTile, UtilityTile } from '../types';
 import { TILES, getTilesByGroup } from '../board-data';
+import { HOUSE_SELL_BACK_RATIO } from './constants';
 
 export function canAfford(player: Player, amount: number): boolean {
   return player.money >= amount;
@@ -87,7 +88,7 @@ export function getTotalAssets(playerId: string, state: GameState): number {
         total += propTile.mortgage;
       } else {
         total += propTile.mortgage;
-        total += propertyState.houses * (propTile.houseCost / 2);
+        total += propertyState.houses * (propTile.houseCost * HOUSE_SELL_BACK_RATIO);
       }
     } else if (tile.type === 'railroad' || tile.type === 'utility') {
       const otherTile = tile as RailroadTile | UtilityTile;

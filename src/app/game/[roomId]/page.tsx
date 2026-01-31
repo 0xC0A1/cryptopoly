@@ -4,6 +4,7 @@ import { useCallback, useEffect, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useGameStore } from '@/lib/stores/game-store';
+import { GAME_NAME } from '@/lib/game/constants';
 import { PlayerPanel } from '@/components/game/PlayerPanel';
 import { ActionPanel } from '@/components/game/ActionPanel';
 import { PropertyCard } from '@/components/game/PropertyCard';
@@ -39,7 +40,7 @@ function GameHeader() {
   return (
     <header className="absolute top-0 left-0 right-0 z-10 p-4 flex items-center justify-between">
       <div className="flex items-center gap-4">
-        <h1 className="text-xl font-semibold text-white tracking-tight">CRYPTOPOLY</h1>
+        <h1 className="text-xl font-semibold text-white tracking-tight">{GAME_NAME.toUpperCase()}</h1>
         {roomId && (
           <div className="px-3 py-1.5 rounded-lg border border-white/20 text-sm">
             <span className="text-white/60">Room </span>
