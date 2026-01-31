@@ -12,6 +12,7 @@ A crypto-themed Monopoly-style board game with **real-time multiplayer** over We
 - [Architecture overview](#architecture-overview)
 - [Dependencies](#dependencies)
 - [How it works](#how-it-works)
+- [Game mechanics](#game-mechanics)
 - [Implementation tricks](#implementation-tricks)
 - [Project structure](#project-structure)
 - [Contributing](#contributing)
@@ -132,8 +133,8 @@ So every mutation flows: **guest → host → apply → STATE_UPDATE to sender +
 
 ### 4. Game flow
 
-- **Lobby**: Players see each other via `gameState.players` (synced by JOIN_GAME and STATE_UPDATE). Host can start when 2–6 players. `START_GAME` includes an authoritative `turnOrder` (host shuffles and sends it) so all clients have the same order.
-- **Playing**: Current player clicks Roll → store sets `isRolling = true`. Dice run a **physics roll** (see below). When both dice settle, we call `applyDiceResult(result, seed)` which dispatches `ROLL_DICE` with the seed; host applies it and broadcasts. Others receive state with `currentDiceRoll`, `lastDiceRollId`, `lastDiceRollSeed` and run a **display roll** with the same seed so the animation matches.
+- **Lobby**: Players see each other via `gameState.players` (synced by JOIN_GAME and STATE_UPDATE). Everyone picks a token (crypto icon); host can **Start game** when there are 2–6 players. `START_GAME` sends an authoritative `turnOrder` (host shuffles player IDs) so all clients have the same turn order. Phase goes from `lobby` to `playing`.
+- **Playing**: Turn phases are `pre-roll` → (roll) → `action` or `end-turn`. Current player clicks **Roll** → store sets `isRolling = true`. Dice run a **physics roll** (see below). When both dice settle, we call `applyDiceResult(result, seed)` which dispatches `ROLL_DICE` with the seed; host applies it and broadcasts. Others receive state with `currentDiceRoll`, `lastDiceRollId`, `lastDiceRollSeed` and run a **display roll** with the same seed so the animation matches. After the roll, the engine moves the player, applies landing (buy/rent/tax/card/jail/free-parking), and sets `pendingAction` when the player must choose (buy vs auction, pay rent, pay tax, draw card, execute card). When the player has nothing left to do, they click **End turn**; turn advances and `turnPhase` resets to `pre-roll`.
 
 ### 5. Dice (deterministic animation)
 
@@ -170,10 +171,61 @@ So every mutation flows: **guest → host → apply → STATE_UPDATE to sender +
    Dice spawn at y=8 inside an invisible box (floor, four walls, ceiling) so they never leave the pit regardless of bounces.
 
 9. **Board layout**  
-   `BOARD_SIZE = 25`, with corner and tile sizes chosen so the Monopoly loop (2 corners + 9 tiles per side) fits without overlap; inner corners (e.g. Jail, Free Parking) use `END_CORNER_OFFSET` for alignment.
+   `BOARD_SIZE = 40` (tiles). The 3D board uses a 10-unit square with tile positions computed per side (e.g. `getTilePosition` in `board-data/tiles.ts`) so the classic Monopoly loop (4 sides, 10 tiles each) fits without overlap.
 
 10. **Split engine and store**  
     The engine is in `src/lib/game/engine/` (apply-action, movement, rent, tiles, etc.) and is pure. The store composes actions (lobby, game, trade, sync, UI) and calls `applyAction`; networking is unaware of game rules.
+
+---
+
+## Game mechanics
+
+Cryptopoly follows classic Monopoly rules on a **40-tile** crypto-themed board. All values are in **USDT**.
+
+### Board and tiles
+
+- **Go** (0): Pass or land → collect **200 USDT**.
+- **Properties**: 22 spaces in color groups (Meme, Layer 2, DeFi, Smart Contracts, Oracle, Rising Stars, Layer 1, Elite). Each has a price, base rent, and rent tiers for 1–4 houses and hotel. **Railroads** (4 tiles, “Exchanges”): rent depends on how many railroads the owner holds (25 / 50 / 100 / 200). **Utilities** (2 tiles, “Mining & Staking”): rent = dice total × 4 (one owned) or × 10 (both owned).
+- **Chance** (“Market Volatility”) and **Community Chest** (“Airdrop”): draw a card; some cards move you, pay/collect money, go to jail, or give Get Out of Jail Free.
+- **Tax** (Gas Fees, Capital Gains Tax): pay the amount to **Free Parking**.
+- **Jail** (10): “Just visiting” or in jail (see below).
+- **Go to Jail** (30): move to Jail, do not collect Go, turn ends.
+- **Free Parking** (20): if the pool has money (from tax/card), you collect it; otherwise nothing.
+
+### Economy and turn flow
+
+- **Starting money**: 1,500 USDT per player.
+- **Turn**: Current player is in `pre-roll`. They **Roll** (two dice). If they’re in jail, they must pay fine, use a Get Out of Jail Free card, or roll for doubles; after 3 failed attempts they must pay the **50 USDT** fine. **Three doubles in a row** (in one turn) sends the player to Jail.
+- After the roll: move that many spaces (0–39, wrap at Go and collect 200 if passing). **Landing** triggers:
+  - **Unowned property/railroad/utility**: pending **buy or auction**. Player can **Buy** at list price or **Auction** (all non-bankrupt players bid in turn; high bidder wins, others pass).
+  - **Owned by another** (not mortgaged): **Pay rent** (see below).
+  - **Chance / Community Chest**: **Draw card** → then **Execute card** (some cards set a new pending action, e.g. pay rent if “advance to railroad” and it’s owned).
+  - **Tax**: **Pay tax** (money goes to Free Parking).
+  - **Go to Jail**: move to Jail, turn ends.
+  - **Free Parking**: collect pool if any.
+- When the player has resolved the landing (and any card), they can optionally **build houses**, **sell houses**, **mortgage** or **unmortgage** (unmortgage = mortgage × 1.1). Then **End turn** → next player, `turnPhase` back to `pre-roll`.
+
+### Rent and property rules
+
+- **Property**: Base rent; if the owner has a **monopoly** (all of that color), unimproved rent is **double**. With 1–4 houses or a hotel, rent comes from the tile’s rent table. You must build **evenly** (no more than one house ahead of others in the same group).
+- **Railroads**: Rent is 25 / 50 / 100 / 200 for 1 / 2 / 3 / 4 owned.
+- **Utilities**: Dice total × 4 (one) or × 10 (both).
+- **Mortgage**: Pays owner half of the “mortgage value” on the tile; no rent while mortgaged. Must unmortgage at 110% of mortgage value. No building on mortgaged properties; must sell houses to mortgage.
+
+### Jail
+
+- **In jail**: You don’t move. Each turn you may **Pay 50 USDT**, **Use Get Out of Jail Free**, or **Roll**. Doubles → get out, move the rolled total. Otherwise jail turn counter increases; after **3 turns** you must pay the 50 to get out, then move.
+- **Get Out of Jail Free**: From Chance or Community Chest; use when in jail to leave without paying (no move that turn when using the card). Card can be kept or traded.
+
+### Trades, bankruptcy, winning
+
+- **Trading**: Players can propose trades (properties + USDT). The other player can **Accept** or **Reject**. On accept, money and properties swap; the engine updates ownership and balances.
+- **Bankruptcy**: If you owe more than you can pay (rent, tax, etc.), you **Declare bankruptcy** to the creditor (player or bank). Your cash and properties (and Get Out of Jail Free cards) go to the creditor; you’re out. If you go bankrupt to the bank, your properties are returned to the bank (unowned).
+- **Winner**: When only one player is left non-bankrupt, the game ends (`phase: 'finished'`, `winnerId` set).
+
+### Summary of engine behavior
+
+- **Pure reducer**: `applyAction(state, action) → newState`. All moves, rent, jail, cards, trades, and bankruptcy are implemented in `lib/game/engine/` (e.g. `apply-action.ts`, `apply-action-roll.ts`, `tiles.ts`, `rent.ts`, `movement.ts`). The UI and network layer only dispatch actions and display state; they do not duplicate game rules.
 
 ---
 
