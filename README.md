@@ -4,6 +4,8 @@ A crypto-themed Monopoly-style board game with **real-time multiplayer** over We
 
 **P2P by default**: No central server required. Create and join use **copy-paste signaling** (host and guest exchange connection strings in the lobby). All game traffic is peer-to-peer over WebRTC. An optional HTTP signaling API is available for dev or when you prefer a server relay.
 
+![Cryptopoly gameplay](public/screenshot.png)
+
 ---
 
 ## Table of contents
