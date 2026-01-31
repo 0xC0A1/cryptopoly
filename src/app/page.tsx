@@ -8,13 +8,12 @@ import { GAME_NAME, GAME_TAGLINE } from '@/lib/game/constants';
 export default function Home() {
   const router = useRouter();
   const [playerName, setPlayerName] = useState('');
-  const [roomCode, setRoomCode] = useState('');
   const [mode, setMode] = useState<'menu' | 'create' | 'join'>('menu');
+  const [joinLink, setJoinLink] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const createRoom = useGameStore(state => state.createRoom);
-  const joinRoom = useGameStore(state => state.joinRoom);
+  const createRoomOffline = useGameStore(state => state.createRoomOffline);
 
   const handleCreateGame = async () => {
     if (!playerName.trim()) {
@@ -24,7 +23,7 @@ export default function Home() {
     setIsLoading(true);
     setError('');
 
-    const roomId = await createRoom(playerName.trim());
+    const roomId = await createRoomOffline(playerName.trim());
 
     if (roomId) {
       router.push('/lobby');
@@ -34,27 +33,23 @@ export default function Home() {
     }
   };
 
-  const handleJoinGame = async () => {
-    if (!playerName.trim()) {
-      setError('Please enter your name');
+  const handleOpenJoinLink = () => {
+    const raw = joinLink.trim();
+    if (!raw) {
+      setError('Paste the join link the host sent you');
       return;
     }
-    if (!roomCode.trim()) {
-      setError('Please enter a room code');
-      return;
-    }
-
-    setIsLoading(true);
     setError('');
-
-    const roomId = await joinRoom(roomCode.toUpperCase(), playerName.trim());
-
-    if (roomId) {
-      router.push('/lobby');
-    } else {
-      setError('Room not found');
-      setIsLoading(false);
+    try {
+      const url = raw.startsWith('http') ? raw : `https://${raw}`;
+      if (new URL(url).pathname.startsWith('/join/')) {
+        window.location.href = url;
+        return;
+      }
+    } catch {
+      // not a full URL
     }
+    setError('That doesn’t look like a join link. Open the link the host sent you in your browser.');
   };
 
   return (
@@ -83,7 +78,7 @@ export default function Home() {
               onClick={() => setMode('join')}
               className="btn btn-secondary w-full text-lg py-4"
             >
-              Join Game
+              I have a join link
             </button>
           </div>
         )}
@@ -126,32 +121,17 @@ export default function Home() {
         {mode === 'join' && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-white mb-4">Join Game</h2>
+            <p className="text-sm text-white/60 mb-2">
+              Open the join link the host sent you (in your browser or paste it below).
+            </p>
             <div>
-              <label className="block text-sm text-white/70 mb-1">Your Name</label>
+              <label className="block text-sm text-white/70 mb-1">Join link</label>
               <input
                 type="text"
-                value={playerName}
-                onChange={(e) => {
-                  setPlayerName(e.target.value);
-                  setError('');
-                }}
-                placeholder="Enter your name"
-                className="w-full"
-                maxLength={20}
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-white/70 mb-1">Room Code</label>
-              <input
-                type="text"
-                value={roomCode}
-                onChange={(e) => {
-                  setRoomCode(e.target.value.toUpperCase());
-                  setError('');
-                }}
-                placeholder="Enter 6-character code"
-                className="w-full text-center text-2xl tracking-widest"
-                maxLength={6}
+                value={joinLink}
+                onChange={(e) => { setJoinLink(e.target.value); setError(''); }}
+                placeholder="Paste the link here…"
+                className="w-full p-3 rounded-lg bg-white/5 border border-white/20 text-white placeholder:text-white/40 text-sm"
               />
             </div>
             {error && <p className="text-white/80 text-sm">{error}</p>}
@@ -163,10 +143,10 @@ export default function Home() {
                 Back
               </button>
               <button
-                onClick={handleJoinGame}
+                onClick={handleOpenJoinLink}
                 className="btn btn-primary flex-1"
               >
-                Join
+                Open link
               </button>
             </div>
           </div>

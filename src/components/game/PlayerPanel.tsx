@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '@/lib/stores/game-store';
 import { getCurrentPlayer } from '@/lib/game/engine';
-import { TOKEN_COLORS, Player } from '@/lib/game/types';
+import { TOKEN_IMAGES, TOKEN_NAMES, Player } from '@/lib/game/types';
 import { cn } from '@/lib/utils';
 
 interface PlayerCardProps {
@@ -14,8 +14,6 @@ interface PlayerCardProps {
 }
 
 function PlayerCard({ player, isCurrentPlayer, isLocalPlayer }: PlayerCardProps) {
-  const tokenColor = TOKEN_COLORS[player.token];
-
   return (
     <div
       className={cn(
@@ -29,18 +27,12 @@ function PlayerCard({ player, isCurrentPlayer, isLocalPlayer }: PlayerCardProps)
     >
       <div className="flex items-center gap-3">
         {/* Token indicator */}
-        <div
-          className="w-10 h-10 rounded-full flex items-center justify-center"
-          style={{ backgroundColor: tokenColor }}
-        >
-          <span className="text-lg font-bold text-white">
-            {player.token === 'bitcoin' && '₿'}
-            {player.token === 'ethereum' && 'Ξ'}
-            {player.token === 'solana' && '◎'}
-            {player.token === 'dogecoin' && 'Ð'}
-            {player.token === 'cardano' && 'A'}
-            {player.token === 'polkadot' && '●'}
-          </span>
+        <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden bg-black/20">
+          <img
+            src={TOKEN_IMAGES[player.token]}
+            alt={TOKEN_NAMES[player.token]}
+            className="w-8 h-8 object-contain"
+          />
         </div>
 
         {/* Player info */}

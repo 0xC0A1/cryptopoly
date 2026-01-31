@@ -51,6 +51,10 @@ const CARD_COUNT = 10;
 const CARD_THICKNESS = 0.06;
 const CARD_WIDTH = 2.2;
 const CARD_HEIGHT = 1.4;
+// Drawn card displayed in center – larger for readability, avoids z-fighting with back face
+const DRAWN_CARD_WIDTH = 3.2;
+const DRAWN_CARD_HEIGHT = 2.0;
+const DRAWN_CARD_FACE_OFFSET = 0.012; // push face plane slightly in front of box to prevent z-fighting
 
 function CardPile({
   color,
@@ -100,8 +104,8 @@ const DISPLAY_POSITION: [number, number, number] = [0, 2, 0];
 /** Create a canvas texture with card color, title, and description for the drawn card front face */
 function useCardFaceTexture(title: string, description: string, color: string): THREE.CanvasTexture {
   return useMemo(() => {
-    const w = 512;
-    const h = 320;
+    const w = 896;
+    const h = 560;
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
@@ -112,14 +116,14 @@ function useCardFaceTexture(title: string, description: string, color: string): 
     ctx.fillStyle = color;
     ctx.fillRect(0, 0, w, h);
     ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(2, 2, w - 4, h - 4);
+    ctx.lineWidth = 6;
+    ctx.strokeRect(3, 3, w - 6, h - 6);
 
-    const pad = 32;
-    let y = 44;
+    const pad = 56;
+    let y = 88;
 
-    // Title – bold, larger, with black outline for readability
-    ctx.font = 'bold 32px system-ui, sans-serif';
+    // Title – bold, large for readability
+    ctx.font = 'bold 72px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const titleWords = title.split(/\s+/);
@@ -135,18 +139,18 @@ function useCardFaceTexture(title: string, description: string, color: string): 
     }
     if (line) titleLines.push(line);
     titleLines.forEach((l) => {
-      ctx.strokeStyle = '#000000';
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
       ctx.lineWidth = 3;
       ctx.strokeText(l, w / 2, y);
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#1a1a1a';
       ctx.fillText(l, w / 2, y);
-      y += 36;
+      y += 78;
     });
 
-    y += 16;
-    ctx.font = '18px system-ui, sans-serif';
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#000000';
+    y += 28;
+    ctx.font = '44px system-ui, sans-serif';
+    ctx.fillStyle = '#1a1a1a';
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
     ctx.lineWidth = 2;
     const descWords = description.split(/\s+/);
     let descLine = '';
@@ -157,7 +161,7 @@ function useCardFaceTexture(title: string, description: string, color: string): 
         if (descLine) {
           ctx.strokeText(descLine, w / 2, y);
           ctx.fillText(descLine, w / 2, y);
-          y += 22;
+          y += 50;
         }
         descLine = word;
       }
@@ -198,7 +202,7 @@ function DrawnCard({ card, cardType }: { card: Card; cardType: 'chance' | 'commu
   return (
     <group ref={groupRef} position={[...startPos]}>
       <mesh>
-        <boxGeometry args={[CARD_WIDTH, CARD_THICKNESS, CARD_HEIGHT]} />
+        <boxGeometry args={[DRAWN_CARD_WIDTH, CARD_THICKNESS, DRAWN_CARD_HEIGHT]} />
         <meshStandardMaterial
           color={color}
           metalness={0.2}
@@ -208,13 +212,19 @@ function DrawnCard({ card, cardType }: { card: Card; cardType: 'chance' | 'commu
         />
       </mesh>
       {/* Front face plane: on card’s -Y face so when card tilts -90° X it faces camera (+Z) */}
-      <mesh position={[0, -CARD_THICKNESS / 2, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[CARD_WIDTH, CARD_HEIGHT]} />
+      <mesh
+        position={[0, -CARD_THICKNESS / 2 - DRAWN_CARD_FACE_OFFSET, 0]}
+        rotation={[Math.PI / 2, 0, 0]}
+      >
+        <planeGeometry args={[DRAWN_CARD_WIDTH, DRAWN_CARD_HEIGHT]} />
         <meshStandardMaterial
           map={faceTexture}
           transparent={false}
           side={THREE.FrontSide}
           depthWrite={true}
+          polygonOffset={true}
+          polygonOffsetFactor={-2}
+          polygonOffsetUnits={-2}
         />
       </mesh>
     </group>
@@ -229,8 +239,11 @@ interface TileComponentProps {
 function TileComponent({ tile, index }: TileComponentProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const gameState = useGameStore(state => state.gameState);
+  const setShowPropertyCard = useGameStore(state => state.setShowPropertyCard);
   const propertyState = gameState?.properties[index];
   const owner = propertyState?.ownerId ? gameState?.players[propertyState.ownerId] : null;
+  const isClickable =
+    tile.type === 'property' || tile.type === 'railroad' || tile.type === 'utility';
 
   // Calculate position based on index – corners are square (CORNER_SIZE × CORNER_SIZE), no overlap
   const position = useMemo(() => {
@@ -321,8 +334,19 @@ function TileComponent({ tile, index }: TileComponentProps) {
       <mesh
         ref={meshRef}
         receiveShadow
-        onPointerOver={() => setHovered(true)}
-        onPointerOut={() => setHovered(false)}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setHovered(true);
+          if (isClickable) document.body.style.cursor = 'pointer';
+        }}
+        onPointerOut={() => {
+          setHovered(false);
+          document.body.style.cursor = 'default';
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (isClickable) setShowPropertyCard(index);
+        }}
       >
         <boxGeometry args={[position.width - 0.05, 0.1, position.depth - 0.05]} />
         <meshStandardMaterial
@@ -334,7 +358,22 @@ function TileComponent({ tile, index }: TileComponentProps) {
 
       {/* Color band for properties – always on inner edge (toward board center) */}
       {hasColorBand && (
-        <mesh position={[0, 0.06, colorBandZ]}>
+        <mesh
+          position={[0, 0.06, colorBandZ]}
+          onPointerOver={(e) => {
+            e.stopPropagation();
+            setHovered(true);
+            document.body.style.cursor = 'pointer';
+          }}
+          onPointerOut={() => {
+            setHovered(false);
+            document.body.style.cursor = 'default';
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowPropertyCard(index);
+          }}
+        >
           <boxGeometry args={[position.width - 0.1, 0.05, 0.7]} />
           <meshStandardMaterial
             color={tileColor}

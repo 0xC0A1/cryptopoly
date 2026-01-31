@@ -2,7 +2,7 @@
 
 import { useGameStore } from '@/lib/stores/game-store';
 import { TILES } from '@/lib/game/board-data';
-import { PropertyTile, RailroadTile, UtilityTile, GROUP_COLORS, GROUP_NAMES, TOKEN_COLORS } from '@/lib/game/types';
+import { PropertyTile, RailroadTile, UtilityTile, GROUP_COLORS, GROUP_NAMES, TOKEN_IMAGES, TOKEN_NAMES } from '@/lib/game/types';
 import { cn } from '@/lib/utils';
 
 export function PropertyCard() {
@@ -48,10 +48,13 @@ export function PropertyCard() {
         {/* Ownership */}
         {owner && (
           <div className="mb-4 p-3 rounded-lg border border-white/10 flex items-center gap-3">
-            <div
-              className="w-8 h-8 rounded-full"
-              style={{ backgroundColor: TOKEN_COLORS[owner.token] }}
-            />
+            <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden bg-black/20">
+              <img
+                src={TOKEN_IMAGES[owner.token]}
+                alt={TOKEN_NAMES[owner.token]}
+                className="w-6 h-6 object-contain"
+              />
+            </div>
             <div>
               <div className="text-xs text-white/50">Owned by</div>
               <div className="font-medium text-white text-sm">{owner.name}</div>

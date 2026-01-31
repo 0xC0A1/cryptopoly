@@ -19,6 +19,10 @@ const initialState = {
   isHost: false,
   isConnected: false,
   connectionError: null as string | null,
+  signalingMode: 'paste' as GameStore['signalingMode'],
+  pasteConnectionString: null as string | null,
+  pasteResponseString: null as string | null,
+  peerConnectionEstablished: false,
   gameState: null as GameStore['gameState'],
   selectedToken: null as GameStore['selectedToken'],
   isRolling: false,
@@ -27,6 +31,8 @@ const initialState = {
   chatMessages: [] as GameStore['chatMessages'],
   broadcastAction: null as GameStore['broadcastAction'],
   sendToHost: null as GameStore['sendToHost'],
+  submitPasteHostOffer: null as GameStore['submitPasteHostOffer'],
+  submitPasteGuestResponse: null as GameStore['submitPasteGuestResponse'],
 };
 
 export const useGameStore = create<GameStore>()(

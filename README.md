@@ -2,6 +2,8 @@
 
 A crypto-themed Monopoly-style board game with **real-time multiplayer** over WebRTC. Built with Next.js, React Three Fiber, and a deterministic game engine.
 
+**P2P by default**: No central server required. Create and join use **copy-paste signaling** (host and guest exchange connection strings in the lobby). All game traffic is peer-to-peer over WebRTC. An optional HTTP signaling API is available for dev or when you prefer a server relay.
+
 ---
 
 ## Table of contents
@@ -12,17 +14,19 @@ A crypto-themed Monopoly-style board game with **real-time multiplayer** over We
 - [How it works](#how-it-works)
 - [Implementation tricks](#implementation-tricks)
 - [Project structure](#project-structure)
+- [Contributing](#contributing)
+- [Deploy](#deploy)
 
 ---
 
 ## Quick start
 
 ```bash
-npm install
-npm run dev
+pnpm install   # or: npm install
+pnpm dev       # or: npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Create a room, share the code, open another tab/window and join with the same code. Pick tokens and start the game.
+Open [http://localhost:3000](http://localhost:3000). **Create** a game and go to the lobby. **Host** copies the **join link** and shares it (e.g. messaging app). The other player **opens that link** (or pastes it on the home page under “I have a join link”) and enters their name. In the lobby, **guest** copies the **complete link** and sends it to the host; **host** opens that link to finish the connection. Once connected, pick tokens and start the game. No server and no room codes — just the links.
 
 ---
 
@@ -47,11 +51,11 @@ Open [http://localhost:3000](http://localhost:3000). Create a room, share the co
         │
         ▼
 ┌───────────────────┐     ┌───────────────────┐     ┌───────────────────┐
-│  Signaling API     │     │  PeerManager       │     │  Game store        │
-│  /api/signaling    │◄───►│  (WebRTC)          │◄───►│  (Zustand + Immer) │
-│  HTTP polling      │     │  Host creates      │     │  gameState +       │
-│  create/join room  │     │  offers; guests    │     │  actions → engine  │
-│  SDP/ICE relay     │     │  answer            │     │  applyAction()     │
+│  Signaling         │     │  PeerManager       │     │  Game store        │
+│  (pluggable)       │◄───►│  (WebRTC)          │◄───►│  (Zustand + Immer) │
+│  Default: paste    │     │  Host creates      │     │  gameState +       │
+│  (no server);      │     │  offers; guests    │     │  actions → engine  │
+│  optional: HTTP API│     │  answer            │     │  applyAction()     │
 └───────────────────┘     └───────────────────┘     └───────────────────┘
                                                               │
                                                               ▼
@@ -64,6 +68,18 @@ Open [http://localhost:3000](http://localhost:3000). Create a room, share the co
 
 - **Host is authority**: The host applies all actions and broadcasts them; guests send `ACTION_REQUEST` to the host. The host applies the action, then sends `STATE_UPDATE` back to the sender (and broadcasts the action to others) so everyone ends up with the same state.
 - **Single source of truth**: Game state lives in the Zustand store; the engine is a pure reducer. No duplicate game logic on the server (the API only does signaling).
+
+### Layers (top to bottom)
+
+| Layer | Location | Responsibility |
+|-------|----------|----------------|
+| **UI / Routes** | `app/`, `components/` | Pages (home, lobby, game), 3D scene (Board, Dice, PlayerTokens), panels (ActionPanel, PlayerPanel, PropertyCard). No game logic. |
+| **Connection** | `GameConnectionProvider`, `lib/networking/` | Pluggable signaling: **PasteSignalingClient** (default, no server — copy-paste SDP in lobby) or **HttpSignalingClient** (optional `/api/signaling`). `PeerManager` establishes WebRTC and routes `ACTION_REQUEST` / `STATE_UPDATE` to the store. |
+| **State & actions** | `lib/stores/game-store/` | Zustand + Immer. Holds `roomId`, `localPlayerId`, `gameState`, and action creators (lobby, game, trade, sync, UI). All mutations go through the engine via `applyAction`. |
+| **Game engine** | `lib/game/engine/` | Pure reducer: `applyAction(state, action) → newState`. Handles movement, rent, dice, tiles, validation. No I/O, no React. |
+| **Game data** | `lib/game/board-data/`, `lib/game/constants.ts`, `lib/game/types.ts` | Tiles, Chance/Community Chest cards, display names, board dimensions. Engine and UI both read from here. |
+
+Data flow: **User → Store action → (if host) apply in engine and broadcast; (if guest) sendToHost → host applies → STATE_UPDATE → store merges state.** The engine is the only place that computes new game state.
 
 ---
 
@@ -79,13 +95,18 @@ Open [http://localhost:3000](http://localhost:3000). Create a room, share the co
 | **@react-three/drei** | Helpers (Text, RoundedBox, OrbitControls, Environment, Stars) |
 | **@react-three/rapier** | Physics (RigidBody, CuboidCollider) for dice |
 | **Three.js** | 3D board, tokens, dice meshes, quaternions for face value |
-| **nanoid** | Player IDs and room codes |
+| **nanoid** | Player IDs; internal room id for join URL path |
 | **Tailwind CSS 4** | Styling |
 | **Framer Motion** | Animations (e.g. modals) |
 | **Radix UI** | Accessible primitives (Dialog, Slot) |
 | **lucide-react** | Icons |
 
-The signaling API is a **plain HTTP polling** route (POST for actions, GET for messages). For production you’d typically replace it with a WebSocket or similar; the rest of the stack stays the same.
+### Signaling: no server by default
+
+- **Default (paste mode)**: Create uses **createRoomOffline**; join is by **link only**. Host shares a **join link** (`/join/[id]#<offer>`); guest opens it (or pastes it on the home page) and enters their name, then gets a **complete link** to send back; host opens that link to finish. No server and no room codes; once connected, all traffic is P2P over WebRTC.
+- **Optional (server mode)**: Use **createRoom** / **joinRoom** to hit `/api/signaling` (HTTP polling). The API creates/joins rooms and relays SDP/ICE. Useful for dev or when you want a central relay; game logic still runs only on clients.
+
+Signaling is **pluggable** (`ISignalingClient`): `PasteSignalingClient` (no server), `HttpSignalingClient` (optional API). `PeerManager` accepts either.
 
 ---
 
@@ -93,9 +114,9 @@ The signaling API is a **plain HTTP polling** route (POST for actions, GET for m
 
 ### 1. Rooms and signaling
 
-- **Create room**: POST `/api/signaling` with `{ action: 'create-room', peerId }`. API generates a 6-character room code, stores `roomId → { hostId, peers }`, returns `roomId`. The client stores `roomId`, `localPlayerId`, sets `isHost = true`, creates initial game state, and applies `JOIN_GAME` locally.
-- **Join room**: POST with `{ action: 'join-room', peerId, roomId }`. API adds the peer to the room and notifies the host via polling. The joiner gets `roomId` and `hostId`, creates initial state, applies `JOIN_GAME` locally.
-- **GameConnectionProvider**: When `roomId` and `localPlayerId` are set, it instantiates `PeerManager`, which uses `HttpSignalingClient` to poll for signaling messages (peer-joined, offer, answer, ice-candidate). WebRTC connections are established; game messages (`ACTION_REQUEST`, `STATE_UPDATE`) go over RTC data channels.
+- **Default — no server (paste mode)**: Create room → host goes to lobby and copies the **join link** (`/join/[id]#<offer>`). Guest opens that link (or pastes it on the home page under “I have a join link”), enters name, and joins the lobby. Guest copies the **complete link** (`/connect#<answer>`) and sends it to the host; host opens that link to complete the connection. WebRTC connection is established; game messages go over the data channel. No server, no room codes.
+- **Optional — server**: POST `/api/signaling` with `create-room` or `join-room`; API generates/returns room code and relays SDP/ICE via polling. Same WebRTC data channel once connected.
+- **GameConnectionProvider**: When `roomId` and `localPlayerId` are set, it creates `PeerManager` with the right signaling client (paste or HTTP). PeerManager establishes WebRTC; game messages (`ACTION_REQUEST`, `STATE_UPDATE`) go over RTC data channels.
 
 ### 2. Host vs guest
 
@@ -162,29 +183,84 @@ So every mutation flows: **guest → host → apply → STATE_UPDATE to sender +
 src/
 ├── app/
 │   ├── api/signaling/route.ts    # HTTP polling signaling (create/join room, SDP/ICE)
-│   ├── page.tsx                  # Home: create or join room
-│   ├── lobby/page.tsx            # Lobby: token pick, start game
+│   ├── page.tsx                  # Home: create game or paste join link
+│   ├── join/[roomId]/page.tsx    # Join page: open/paste join link, enter name
+│   ├── connect/page.tsx          # Host opens guest's complete link → redirect to lobby
+│   ├── lobby/page.tsx            # Lobby: token pick, copy join/complete links
 │   ├── game/[roomId]/page.tsx    # Game: 3D scene + panels + dice handler
 │   ├── layout.tsx                # GameConnectionProvider wraps app
 │   └── globals.css
 ├── components/
 │   ├── GameConnectionProvider.tsx # Creates PeerManager when in room, wires messages → store
 │   ├── game/                     # ActionPanel, PlayerPanel, PropertyCard
-│   └── three/                   # Board, Dice, PlayerTokens, Scene (Canvas + Physics)
+│   └── three/                    # Board, Dice, PlayerTokens, Scene (Canvas + Physics)
 └── lib/
     ├── game/
-    │   ├── types.ts              # GameState, GameAction, tiles, cards, etc.
-    │   ├── engine/               # Pure reducer + helpers (apply-action, movement, rent, tiles, …)
-    │   └── board-data/           # TILES, Chance, Community Chest, getTilePosition, shuffleArray
+    │   ├── types.ts              # GameState, GameAction, tiles, tokens, PropertyGroup, etc.
+    │   ├── constants.ts          # GAME_NAME, TILE_NAMES, board dimensions, branding
+    │   ├── engine/               # Pure reducer + helpers
+    │   │   ├── index.ts          # Public API (applyAction, movePlayer, calculateRent, …)
+    │   │   ├── apply-action.ts   # Main reducer; delegates to apply-action-roll for ROLL_DICE
+    │   │   ├── state.ts, dice.ts, movement.ts, rent.ts, players.ts, tiles.ts, validation.ts
+    │   │   └── constants.ts      # STARTING_MONEY, GO_SALARY, JAIL_*, etc.
+    │   └── board-data/           # Static game data
+    │       ├── index.ts          # TILES, getTilePosition, shuffleArray
+    │       ├── tiles.ts          # Tile definitions (property groups, prices, rent)
+    │       ├── chance-cards.ts, community-chest-cards.ts, helpers.ts
     ├── networking/
-    │   ├── http-signaling.ts     # Polling client for /api/signaling
-    │   └── peer-manager.ts       # WebRTC: create offer/answer, data channel, send/broadcast
+    │   ├── signaling-interface.ts # ISignalingClient (pluggable signaling)
+    │   ├── paste-signaling.ts     # Copy-paste SDP/ICE (no server) — default
+    │   ├── http-signaling.ts     # Optional polling client for /api/signaling
+    │   ├── peer-manager.ts       # WebRTC: create offer/answer, data channel, send/broadcast
+    │   └── signaling.ts          # Optional WebSocket signaling client (not used by default)
     └── stores/
-        └── game-store/           # Zustand slice: state + lobby/game/trade/sync/UI actions
+        └── game-store/
+            ├── index.ts          # useGameStore (Zustand + Immer), selectTile
+            ├── types.ts          # GameStore type
+            └── actions/          # Lobby, game, trade, sync, UI action creators
+                ├── lobby.ts, game.ts, trade.ts, sync.ts, ui.ts
 ```
+
+---
+
+## Contributing
+
+We welcome contributions. Here’s how to get started and where to touch the codebase.
+
+### Setup
+
+- **Node**: Use a current LTS version (e.g. Node 20+).
+- **Package manager**: The project uses **pnpm**. Install dependencies with `pnpm install` (or `npm install` if you don’t use pnpm).
+- **Run locally**: `pnpm dev` (or `npm run dev`), then open [http://localhost:3000](http://localhost:3000).
+- **Lint**: `pnpm lint` (or `npm run lint`). Fix any reported issues before submitting.
+
+### Where to change what
+
+| Goal | Where to look |
+|------|----------------|
+| **New game rule or action** | `lib/game/engine/`: add or extend action handling in `apply-action.ts` (and `apply-action-roll.ts` for dice). Keep the engine pure (no side effects). |
+| **New tile type or card** | `lib/game/board-data/` (tiles, chance-cards, community-chest-cards). Update `lib/game/types.ts` if you add new tile/card shapes. |
+| **Display names, branding, board size** | `lib/game/constants.ts` (TILE_NAMES, GAME_NAME, etc.) and `lib/game/board-data/helpers.ts` for layout. |
+| **UI / panels / 3D board** | `components/game/` (ActionPanel, PlayerPanel, PropertyCard), `components/three/` (Board, Dice, PlayerTokens, Scene). |
+| **Lobby, create/join room, connection** | `lib/stores/game-store/actions/lobby.ts`, `GameConnectionProvider.tsx`, `lib/networking/` (paste-signaling, http-signaling, peer-manager). |
+| **Trade, sync, or other store actions** | `lib/stores/game-store/actions/` (trade, sync, game, ui). |
+| **Signaling (no server vs server)** | Default: `lib/networking/paste-signaling.ts` (copy-paste SDP/ICE). Optional: `app/api/signaling/route.ts` (HTTP polling); `lib/networking/http-signaling.ts`. `lib/networking/signaling-interface.ts` defines the pluggable interface. |
+
+### Conventions
+
+- **Engine purity**: The game engine (`lib/game/engine/`) must remain deterministic and free of I/O. All mutable state lives in the Zustand store; the engine only computes the next state from the current state and action.
+- **Types**: Use the shared types in `lib/game/types.ts` for `GameState`, `GameAction`, tiles, and cards. For store shape, use `lib/stores/game-store/types.ts`.
+- **Styling**: Tailwind CSS. Prefer utility classes and existing patterns in `app/globals.css`.
+- **Commits**: Prefer clear, short messages (e.g. “Add rent calculation for utilities”, “Fix dice roll sync for guests”).
+
+### Pull requests
+
+1. Branch from `main`, make your changes, and run `pnpm lint` and a quick manual test (create room, join, roll, move).
+2. Open a PR with a short description of what changed and why.
+3. Keep PRs focused; split large features into smaller steps when possible.
 
 ---
 
 ## Deploy
 
-The app is a standard Next.js app. The signaling API uses in-memory storage; rooms are lost on restart. For production you’d replace it with a persistent signaling backend (e.g. WebSockets or a hosted service) and keep the same client-side architecture.
+The app is a standard Next.js app. **By default no server is needed** for signaling (copy-paste in the lobby). If you use the optional `/api/signaling` route, it uses in-memory storage; rooms are lost on restart. For production with server-based signaling you’d replace it with a persistent backend (e.g. WebSockets or a hosted service); the client-side architecture and P2P game traffic stay the same.

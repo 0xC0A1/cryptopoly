@@ -13,6 +13,8 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export type SignalingMode = 'server' | 'paste';
+
 export interface GameStore {
   roomId: string | null;
   localPlayerId: string | null;
@@ -20,6 +22,14 @@ export interface GameStore {
   isHost: boolean;
   isConnected: boolean;
   connectionError: string | null;
+  /** 'paste' = no server, copy-paste SDP; 'server' = HTTP signaling API. */
+  signalingMode: SignalingMode;
+  /** Paste mode: host's connection string to share (set when offer is ready). */
+  pasteConnectionString: string | null;
+  /** Paste mode: guest's response string to share (set when answer is ready). */
+  pasteResponseString: string | null;
+  /** True when WebRTC peer connection is established (e.g. host pasted guest's link). */
+  peerConnectionEstablished: boolean;
   gameState: GameState | null;
   selectedToken: TokenType | null;
   isRolling: boolean;
@@ -33,9 +43,19 @@ export interface GameStore {
     broadcast: (action: GameAction) => void,
     sendToHost: (action: GameAction) => void
   ) => void;
+  setPasteSignalingActions: (submitHost: (s: string) => boolean, submitGuest: (s: string) => boolean) => void;
+  setPasteConnectionString: (s: string | null) => void;
+  setPasteResponseString: (s: string | null) => void;
+  setPeerConnectionEstablished: (value: boolean) => void;
+  submitPasteHostOffer: ((s: string) => boolean) | null;
+  submitPasteGuestResponse: ((s: string) => boolean) | null;
 
   createRoom: (playerName: string) => Promise<string | null>;
   joinRoom: (roomId: string, playerName: string) => Promise<string | null>;
+  /** Create room without server (copy-paste signaling). Default path for P2P. */
+  createRoomOffline: (playerName: string) => Promise<string | null>;
+  /** Join room without server; guest pastes host's connection string in lobby. */
+  joinRoomOffline: (roomId: string, playerName: string) => Promise<string | null>;
   selectToken: (token: TokenType) => void;
   startGame: () => void;
 

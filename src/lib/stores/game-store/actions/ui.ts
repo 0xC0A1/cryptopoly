@@ -13,6 +13,12 @@ export function createUIActions(set: StoreSet, get: StoreGet) {
       });
     },
 
+    setPeerConnectionEstablished: (value: boolean) => {
+      set(state => {
+        state.peerConnectionEstablished = value;
+      });
+    },
+
     addChatMessage: (playerId: string, playerName: string, message: string) => {
       set(state => {
         state.chatMessages.push({
@@ -42,12 +48,20 @@ export function createUIActions(set: StoreSet, get: StoreGet) {
         state.isHost = false;
         state.isConnected = false;
         state.connectionError = null;
+        state.signalingMode = 'paste';
+        state.pasteConnectionString = null;
+        state.pasteResponseString = null;
         state.gameState = null;
         state.selectedToken = null;
         state.isRolling = false;
         state.diceResult = null;
         state.showPropertyCard = null;
         state.chatMessages = [];
+        state.broadcastAction = null;
+        state.sendToHost = null;
+        state.submitPasteHostOffer = null;
+        state.submitPasteGuestResponse = null;
+        state.peerConnectionEstablished = false;
       });
     },
   };

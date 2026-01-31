@@ -1,9 +1,11 @@
 // ============================================
 // CRYPTOPOLY - WebRTC Peer Manager
 // ============================================
+// Uses a pluggable signaling client (HTTP or copy-paste). No server required for paste mode.
 
+import type { ISignalingClient } from './signaling-interface';
 import { HttpSignalingClient } from './http-signaling';
-import { GameAction, NetworkMessage } from '../game/types';
+import { NetworkMessage } from '../game/types';
 
 interface PeerConnection {
   connection: RTCPeerConnection;
@@ -20,6 +22,35 @@ const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun2.l.google.com:19302' },
 ];
 
+const ICE_GATHERING_TIMEOUT_MS = 5000;
+
+/** Wait for ICE gathering to complete and return collected candidates (for copy-paste or batch send). */
+function waitForIceGatheringComplete(connection: RTCPeerConnection): Promise<RTCIceCandidateInit[]> {
+  return new Promise((resolve) => {
+    const candidates: RTCIceCandidateInit[] = [];
+    const done = () => {
+      connection.removeEventListener('icegatheringstatechange', onState);
+      resolve(candidates);
+    };
+    const onState = () => {
+      if (connection.iceGatheringState === 'complete') {
+        done();
+      }
+    };
+    connection.addEventListener('icegatheringstatechange', onState);
+    connection.onicecandidate = (event) => {
+      if (event.candidate) {
+        candidates.push(event.candidate.toJSON());
+      }
+    };
+    if (connection.iceGatheringState === 'complete') {
+      done();
+      return;
+    }
+    setTimeout(done, ICE_GATHERING_TIMEOUT_MS);
+  });
+}
+
 export interface AttachRoomOptions {
   isHost: boolean;
   hostId: string | null;
@@ -27,9 +58,14 @@ export interface AttachRoomOptions {
   existingPeerIds?: string[];
 }
 
+export interface PeerManagerOptions {
+  /** Signaling client (default: HttpSignalingClient). Use PasteSignalingClient for no server. */
+  signaling?: ISignalingClient;
+}
+
 export class PeerManager {
   private peerId: string;
-  private signaling: HttpSignalingClient;
+  private signaling: ISignalingClient;
   private peers: Map<string, PeerConnection> = new Map();
   private hostId: string | null = null;
   private roomId: string | null = null;
@@ -40,23 +76,21 @@ export class PeerManager {
   private pendingCandidates: Map<string, RTCIceCandidateInit[]> = new Map();
   private unsubSignaling: (() => void) | null = null;
 
-  constructor(peerId: string, baseUrl: string = '') {
+  constructor(peerId: string, baseUrl: string = '', options?: PeerManagerOptions) {
     this.peerId = peerId;
-    this.signaling = new HttpSignalingClient(peerId, baseUrl);
+    this.signaling = options?.signaling ?? new HttpSignalingClient(peerId, baseUrl);
     this.unsubSignaling = this.signaling.onMessage(this.handleSignalingMessage.bind(this));
   }
 
   /**
-   * Attach to a room already created/joined via the HTTP API (e.g. from game store).
-   * Host: will receive peer-joined and create offers.
-   * Guest: will wait for host's offer (do not create offers to existingPeerIds).
+   * Attach to a room. Host: will receive peer-joined and create offer. Guest: will wait for host's offer.
+   * With paste signaling, host gets connection string to share; guest pastes it and gets response string.
    */
-  async attachToRoom(roomId: string, options: AttachRoomOptions): Promise<void> {
+  async attachToRoom(roomId: string, attachOptions: AttachRoomOptions): Promise<void> {
     this.roomId = roomId;
-    this.hostId = options.hostId;
-    this.isHost = options.isHost;
-    await this.signaling.attachToRoom(roomId);
-    // Host: wait for peer-joined. Guest: wait for offer from host (existingPeerIds not used to create offers).
+    this.hostId = attachOptions.hostId;
+    this.isHost = attachOptions.isHost;
+    await this.signaling.attachToRoom(roomId, { isHost: attachOptions.isHost });
   }
 
   private handleSignalingMessage(message: import('../game/types').SignalingMessage): void {
@@ -105,12 +139,6 @@ export class PeerManager {
 
     this.peers.set(peerId, peerConn);
 
-    connection.onicecandidate = (event) => {
-      if (event.candidate) {
-        this.signaling.sendIceCandidate(peerId, event.candidate.toJSON());
-      }
-    };
-
     connection.onconnectionstatechange = () => {
       console.log(`[PeerManager] Connection state with ${peerId}:`, connection.connectionState);
       if (connection.connectionState === 'connected') {
@@ -134,7 +162,8 @@ export class PeerManager {
 
       const offer = await connection.createOffer();
       await connection.setLocalDescription(offer);
-      this.signaling.sendOffer(peerId, offer);
+      const candidates = await waitForIceGatheringComplete(connection);
+      this.signaling.sendOffer(peerId, offer, candidates);
     }
 
     return peerConn;
@@ -179,7 +208,8 @@ export class PeerManager {
 
     const answer = await peerConn.connection.createAnswer();
     await peerConn.connection.setLocalDescription(answer);
-    this.signaling.sendAnswer(fromPeerId, answer);
+    const candidates = await waitForIceGatheringComplete(peerConn.connection);
+    this.signaling.sendAnswer(fromPeerId, answer, candidates);
   }
 
   private async handleAnswer(fromPeerId: string, answer: RTCSessionDescriptionInit): Promise<void> {

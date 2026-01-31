@@ -2,16 +2,16 @@
 // CRYPTOPOLY - HTTP Polling Signaling Client
 // ============================================
 // Matches the Next.js API route: POST for actions, GET for polling messages.
+// Optional: use copy-paste signaling (PasteSignalingClient) for zero server.
 
+import type { ISignalingClient, AttachOptions } from './signaling-interface';
 import { SignalingMessage } from '../game/types';
 
-type MessageHandler = (message: SignalingMessage) => void;
-
-export class HttpSignalingClient {
+export class HttpSignalingClient implements ISignalingClient {
   private peerId: string;
   private baseUrl: string;
   private roomId: string | null = null;
-  private messageHandlers: Set<MessageHandler> = new Set();
+  private messageHandlers: Set<(message: SignalingMessage) => void> = new Set();
   private pollIntervalId: ReturnType<typeof setInterval> | null = null;
   private lastTimestamp = 0;
   private pollIntervalMs = 1500;
@@ -25,7 +25,7 @@ export class HttpSignalingClient {
     return `${this.baseUrl || (typeof window !== 'undefined' ? window.location.origin : '')}/api/signaling`;
   }
 
-  async attachToRoom(roomId: string): Promise<void> {
+  async attachToRoom(roomId: string, _options?: AttachOptions): Promise<void> {
     if (this.roomId) {
       await this.leaveRoom();
     }
@@ -101,12 +101,18 @@ export class HttpSignalingClient {
     return null;
   }
 
-  sendOffer(toPeerId: string, offer: RTCSessionDescriptionInit): void {
+  sendOffer(toPeerId: string, offer: RTCSessionDescriptionInit, candidates?: RTCIceCandidateInit[]): void {
     this.sendMessage(toPeerId, { type: 'offer', offer });
+    for (const c of candidates ?? []) {
+      this.sendMessage(toPeerId, { type: 'ice-candidate', candidate: c });
+    }
   }
 
-  sendAnswer(toPeerId: string, answer: RTCSessionDescriptionInit): void {
+  sendAnswer(toPeerId: string, answer: RTCSessionDescriptionInit, candidates?: RTCIceCandidateInit[]): void {
     this.sendMessage(toPeerId, { type: 'answer', answer });
+    for (const c of candidates ?? []) {
+      this.sendMessage(toPeerId, { type: 'ice-candidate', candidate: c });
+    }
   }
 
   sendIceCandidate(toPeerId: string, candidate: RTCIceCandidateInit): void {
@@ -138,7 +144,7 @@ export class HttpSignalingClient {
     }
   }
 
-  onMessage(handler: MessageHandler): () => void {
+  onMessage(handler: (message: SignalingMessage) => void): () => void {
     this.messageHandlers.add(handler);
     return () => this.messageHandlers.delete(handler);
   }

@@ -29,6 +29,16 @@ export const TOKEN_NAMES: Record<TokenType, string> = {
   polkadot: 'Polkadot',
 };
 
+/** Paths to token logo images (CoinGecko assets in public/assets/tokens). Run `pnpm download-token-images` to fetch. */
+export const TOKEN_IMAGES: Record<TokenType, string> = {
+  bitcoin: '/assets/tokens/bitcoin.png',
+  ethereum: '/assets/tokens/ethereum.png',
+  solana: '/assets/tokens/solana.png',
+  dogecoin: '/assets/tokens/dogecoin.png',
+  cardano: '/assets/tokens/cardano.png',
+  polkadot: '/assets/tokens/polkadot.jpg',
+};
+
 // Property color groups
 export type PropertyGroup =
   | 'meme'      // Brown - cheap meme coins

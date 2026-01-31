@@ -2,12 +2,14 @@
 
 import { useEffect, useRef } from 'react';
 import { PeerManager } from '@/lib/networking/peer-manager';
+import { PasteSignalingClient } from '@/lib/networking/paste-signaling';
 import { useGameStore } from '@/lib/stores/game-store';
 import type { NetworkMessage } from '@/lib/game/types';
 
 /**
- * When the user is in a room (lobby or game), creates a PeerManager, attaches to the
- * HTTP signaling room, and wires broadcast/sendToHost so actions sync over WebRTC.
+ * When the user is in a room (lobby or game), creates a PeerManager with the appropriate
+ * signaling client (paste = no server, copy-paste SDP; server = HTTP polling), and wires
+ * broadcast/sendToHost so actions sync over WebRTC.
  */
 export function GameConnectionProvider({ children }: { children: React.ReactNode }) {
   const peerManagerRef = useRef<PeerManager | null>(null);
@@ -15,8 +17,13 @@ export function GameConnectionProvider({ children }: { children: React.ReactNode
   const roomId = useGameStore(state => state.roomId);
   const localPlayerId = useGameStore(state => state.localPlayerId);
   const isHost = useGameStore(state => state.isHost);
+  const signalingMode = useGameStore(state => state.signalingMode);
   const gameState = useGameStore(state => state.gameState);
   const setConnectionCallbacks = useGameStore(state => state.setConnectionCallbacks);
+  const setPasteSignalingActions = useGameStore(state => state.setPasteSignalingActions);
+  const setPasteConnectionString = useGameStore(state => state.setPasteConnectionString);
+  const setPasteResponseString = useGameStore(state => state.setPasteResponseString);
+  const setPeerConnectionEstablished = useGameStore(state => state.setPeerConnectionEstablished);
   const applyActionFromNetwork = useGameStore(state => state.applyActionFromNetwork);
   const applyStateUpdate = useGameStore(state => state.applyStateUpdate);
 
@@ -26,8 +33,25 @@ export function GameConnectionProvider({ children }: { children: React.ReactNode
     }
 
     const hostId = gameState?.hostId ?? null;
-    const peerManager = new PeerManager(localPlayerId, '');
+    const get = useGameStore.getState;
+
+    const signaling =
+      signalingMode === 'paste'
+        ? new PasteSignalingClient({
+            onConnectionStringReady: (s) => get().setPasteConnectionString(s),
+            onResponseStringReady: (s) => get().setPasteResponseString(s),
+          })
+        : undefined;
+
+    const peerManager = new PeerManager(localPlayerId, '', { signaling });
     peerManagerRef.current = peerManager;
+
+    if (signaling && 'submitHostOffer' in signaling && 'submitGuestResponse' in signaling) {
+      setPasteSignalingActions(
+        (s: string) => (signaling as PasteSignalingClient).submitHostOffer(s),
+        (s: string) => (signaling as PasteSignalingClient).submitGuestResponse(s)
+      );
+    }
 
     peerManager
       .attachToRoom(roomId, {
@@ -73,6 +97,7 @@ export function GameConnectionProvider({ children }: { children: React.ReactNode
         });
 
         const unsubConnected = peerManager.onPeerConnected((peerId) => {
+          setPeerConnectionEstablished(true);
           if (isHost) {
             // In lobby, wait for guest to send JOIN_GAME first; only push state when already in game (reconnect)
             const state = useGameStore.getState().gameState;
@@ -126,13 +151,14 @@ export function GameConnectionProvider({ children }: { children: React.ReactNode
       innerCleanupRef.current = null;
       const pm = peerManagerRef.current;
       peerManagerRef.current = null;
-      setConnectionCallbacks(
-        () => {},
-        () => {}
-      );
+      setConnectionCallbacks(() => {}, () => {});
+      setPasteSignalingActions(() => false, () => false);
+      setPasteConnectionString(null);
+      setPasteResponseString(null);
+      setPeerConnectionEstablished(false);
       pm?.disconnect();
     };
-  }, [roomId, localPlayerId, isHost]); // Intentionally not including gameState to avoid re-running when state updates
+  }, [roomId, localPlayerId, isHost, signalingMode]); // Intentionally not including gameState to avoid re-running when state updates
 
   return <>{children}</>;
 }

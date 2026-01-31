@@ -51,13 +51,17 @@ export function createGameActions(set: StoreSet, get: StoreGet) {
     },
 
     auctionProperty: () => {
-      const { isHost, broadcastAction, gameState } = get();
-      if (!isHost || !gameState?.pendingAction) return;
+      const { isHost, broadcastAction, sendToHost, gameState } = get();
+      if (!gameState?.pendingAction) return;
       if (gameState.pendingAction.type !== 'buy-decision') return;
 
       const action: GameAction = { type: 'AUCTION_PROPERTY', tileIndex: gameState.pendingAction.tileIndex };
-      get().applyActionFromNetwork(action);
-      broadcastAction?.(action);
+      if (isHost) {
+        get().applyActionFromNetwork(action);
+        broadcastAction?.(action);
+      } else {
+        sendToHost?.(action);
+      }
     },
 
     placeBid: (amount: number) => {

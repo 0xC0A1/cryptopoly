@@ -4,6 +4,17 @@
 
 import type { PropertyGroup, TokenType } from './types';
 
+// ─── Room code (client-side, same format as API) ─────────────────────────────
+const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+/** Generate a 6-character room code (for offline/paste mode; no server). */
+export function generateRoomCode(): string {
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += ROOM_CODE_CHARS[Math.floor(Math.random() * ROOM_CODE_CHARS.length)];
+  }
+  return code;
+}
+
 // ─── Game name & branding ───────────────────────────────────────────────────
 /** Display name of the game (logo, headers, page title). */
 export const GAME_NAME = 'Cryptopoly';
