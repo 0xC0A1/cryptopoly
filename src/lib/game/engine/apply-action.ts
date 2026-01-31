@@ -1,0 +1,473 @@
+// ============================================
+// CRYPTOPOLI - Apply game action (main reducer)
+// ============================================
+
+import type { GameState, GameAction, PropertyTile, TokenType } from '../types';
+import { TILES, shuffleArray } from '../board-data';
+import { JAIL_FINE, JAIL_INDEX } from './constants';
+import { createPlayer } from './state';
+import { getCurrentPlayer, getNextPlayerIndex } from './players';
+import { executeCardAction } from './tiles';
+import { canAfford, canBuildHouse, canSellHouse, checkWinner } from './validation';
+import { handleRollDice } from './apply-action-roll';
+
+export function applyAction(state: GameState, action: GameAction): GameState {
+  const newState = { ...state, lastUpdateAt: Date.now() };
+
+  switch (action.type) {
+    case 'JOIN_GAME': {
+      if (newState.players[action.playerId]) {
+        newState.players = {
+          ...newState.players,
+          [action.playerId]: {
+            ...newState.players[action.playerId],
+            name: action.playerName,
+          },
+        };
+        break;
+      }
+      const existingTokens = Object.values(newState.players).map(p => p.token);
+      const availableTokens: TokenType[] = ['bitcoin', 'ethereum', 'solana', 'dogecoin', 'cardano', 'polkadot'];
+      const defaultToken = availableTokens.find(t => !existingTokens.includes(t)) || 'bitcoin';
+
+      newState.players = {
+        ...newState.players,
+        [action.playerId]: createPlayer(action.playerId, action.playerName, defaultToken),
+      };
+      break;
+    }
+
+    case 'LEAVE_GAME': {
+      const { [action.playerId]: _, ...remainingPlayers } = newState.players;
+      newState.players = remainingPlayers;
+      newState.turnOrder = newState.turnOrder.filter(id => id !== action.playerId);
+      break;
+    }
+
+    case 'SELECT_TOKEN': {
+      if (newState.players[action.playerId]) {
+        newState.players = {
+          ...newState.players,
+          [action.playerId]: {
+            ...newState.players[action.playerId],
+            token: action.token,
+          },
+        };
+      }
+      break;
+    }
+
+    case 'START_GAME': {
+      newState.phase = 'playing';
+      newState.turnOrder = action.turnOrder?.length
+        ? action.turnOrder.filter(id => id in newState.players)
+        : shuffleArray(Object.keys(newState.players));
+      newState.currentPlayerIndex = 0;
+      newState.turnPhase = 'pre-roll';
+      break;
+    }
+
+    case 'ROLL_DICE':
+      handleRollDice(newState, action);
+      break;
+
+    case 'BUY_PROPERTY': {
+      const player = newState.players[action.playerId];
+      const tile = TILES[action.tileIndex];
+      if (!player || (tile.type !== 'property' && tile.type !== 'railroad' && tile.type !== 'utility')) break;
+
+      const price = 'price' in tile ? tile.price : 0;
+      if (!canAfford(player, price)) break;
+
+      newState.players = {
+        ...newState.players,
+        [action.playerId]: {
+          ...player,
+          money: player.money - price,
+          properties: [...player.properties, action.tileIndex],
+        },
+      };
+      newState.properties = {
+        ...newState.properties,
+        [action.tileIndex]: {
+          ...newState.properties[action.tileIndex],
+          ownerId: action.playerId,
+        },
+      };
+      newState.pendingAction = null;
+      newState.turnPhase = 'post-roll';
+      break;
+    }
+
+    case 'AUCTION_PROPERTY': {
+      newState.pendingAction = {
+        type: 'auction',
+        tileIndex: action.tileIndex,
+        currentBid: 0,
+        currentBidderId: null,
+        participants: Object.keys(newState.players).filter(id => !newState.players[id].isBankrupt),
+      };
+      break;
+    }
+
+    case 'PLACE_BID': {
+      if (newState.pendingAction?.type !== 'auction') break;
+      newState.pendingAction = {
+        ...newState.pendingAction,
+        currentBid: action.amount,
+        currentBidderId: action.playerId,
+      };
+      break;
+    }
+
+    case 'PASS_AUCTION': {
+      if (newState.pendingAction?.type !== 'auction') break;
+      const auction = newState.pendingAction;
+      const remaining = auction.participants.filter(id => id !== action.playerId);
+
+      if (remaining.length === 1 && auction.currentBidderId) {
+        const winnerId = auction.currentBidderId;
+        const winner = newState.players[winnerId];
+        newState.players = {
+          ...newState.players,
+          [winnerId]: {
+            ...winner,
+            money: winner.money - auction.currentBid,
+            properties: [...winner.properties, auction.tileIndex],
+          },
+        };
+        newState.properties = {
+          ...newState.properties,
+          [auction.tileIndex]: {
+            ...newState.properties[auction.tileIndex],
+            ownerId: winnerId,
+          },
+        };
+        newState.pendingAction = null;
+        newState.turnPhase = 'post-roll';
+      } else if (remaining.length === 0 || (remaining.length === 1 && !auction.currentBidderId)) {
+        newState.pendingAction = null;
+        newState.turnPhase = 'post-roll';
+      } else {
+        newState.pendingAction = {
+          ...auction,
+          participants: remaining,
+        };
+      }
+      break;
+    }
+
+    case 'PAY_RENT': {
+      const payer = newState.players[action.playerId];
+      const receiver = newState.players[action.toPlayerId];
+      if (!payer || !receiver) break;
+
+      newState.players = {
+        ...newState.players,
+        [action.playerId]: { ...payer, money: payer.money - action.amount },
+        [action.toPlayerId]: { ...receiver, money: receiver.money + action.amount },
+      };
+      newState.pendingAction = null;
+      newState.turnPhase = 'post-roll';
+      break;
+    }
+
+    case 'PAY_TAX': {
+      const player = newState.players[action.playerId];
+      if (!player) break;
+
+      newState.players = {
+        ...newState.players,
+        [action.playerId]: { ...player, money: player.money - action.amount },
+      };
+      newState.freeParking += action.amount;
+      newState.pendingAction = null;
+      newState.turnPhase = 'post-roll';
+      break;
+    }
+
+    case 'DRAW_CARD': {
+      const deck = action.cardType === 'chance' ? newState.chanceCards : newState.communityChestCards;
+      if (deck.length === 0) break;
+
+      const [drawnCard, ...remainingCards] = deck;
+      newState.drawnCard = drawnCard;
+
+      if (action.cardType === 'chance') {
+        newState.chanceCards = remainingCards;
+      } else {
+        newState.communityChestCards = remainingCards;
+      }
+
+      newState.pendingAction = { type: 'card-action', card: drawnCard };
+      break;
+    }
+
+    case 'EXECUTE_CARD': {
+      const player = newState.players[action.playerId];
+      if (!player) break;
+
+      executeCardAction(newState, player.id, action.card);
+      newState.drawnCard = null;
+      newState.pendingAction = null;
+      newState.turnPhase = 'post-roll';
+      break;
+    }
+
+    case 'BUILD_HOUSE': {
+      if (!canBuildHouse(action.playerId, action.tileIndex, newState)) break;
+
+      const tile = TILES[action.tileIndex] as PropertyTile;
+      const player = newState.players[action.playerId];
+
+      newState.players = {
+        ...newState.players,
+        [action.playerId]: { ...player, money: player.money - tile.houseCost },
+      };
+      newState.properties = {
+        ...newState.properties,
+        [action.tileIndex]: {
+          ...newState.properties[action.tileIndex],
+          houses: newState.properties[action.tileIndex].houses + 1,
+        },
+      };
+      break;
+    }
+
+    case 'SELL_HOUSE': {
+      if (!canSellHouse(action.playerId, action.tileIndex, newState)) break;
+
+      const tile = TILES[action.tileIndex] as PropertyTile;
+      const player = newState.players[action.playerId];
+
+      newState.players = {
+        ...newState.players,
+        [action.playerId]: { ...player, money: player.money + Math.floor(tile.houseCost / 2) },
+      };
+      newState.properties = {
+        ...newState.properties,
+        [action.tileIndex]: {
+          ...newState.properties[action.tileIndex],
+          houses: newState.properties[action.tileIndex].houses - 1,
+        },
+      };
+      break;
+    }
+
+    case 'MORTGAGE_PROPERTY': {
+      const player = newState.players[action.playerId];
+      const tile = TILES[action.tileIndex];
+      const propertyState = newState.properties[action.tileIndex];
+
+      if (!player || propertyState?.ownerId !== action.playerId) break;
+      if (propertyState.isMortgaged) break;
+      if (propertyState.houses > 0) break;
+
+      const mortgage = 'mortgage' in tile ? tile.mortgage : 0;
+
+      newState.players = {
+        ...newState.players,
+        [action.playerId]: { ...player, money: player.money + mortgage },
+      };
+      newState.properties = {
+        ...newState.properties,
+        [action.tileIndex]: { ...propertyState, isMortgaged: true },
+      };
+      break;
+    }
+
+    case 'UNMORTGAGE_PROPERTY': {
+      const player = newState.players[action.playerId];
+      const tile = TILES[action.tileIndex];
+      const propertyState = newState.properties[action.tileIndex];
+
+      if (!player || propertyState?.ownerId !== action.playerId) break;
+      if (!propertyState.isMortgaged) break;
+
+      const mortgage = 'mortgage' in tile ? tile.mortgage : 0;
+      const unmortgageCost = Math.floor(mortgage * 1.1);
+
+      if (!canAfford(player, unmortgageCost)) break;
+
+      newState.players = {
+        ...newState.players,
+        [action.playerId]: { ...player, money: player.money - unmortgageCost },
+      };
+      newState.properties = {
+        ...newState.properties,
+        [action.tileIndex]: { ...propertyState, isMortgaged: false },
+      };
+      break;
+    }
+
+    case 'PAY_JAIL_FINE': {
+      const player = newState.players[action.playerId];
+      if (!player || !player.inJail) break;
+      if (!canAfford(player, JAIL_FINE)) break;
+
+      newState.players = {
+        ...newState.players,
+        [action.playerId]: {
+          ...player,
+          money: player.money - JAIL_FINE,
+          inJail: false,
+          jailTurns: 0,
+        },
+      };
+      break;
+    }
+
+    case 'USE_JAIL_CARD': {
+      const player = newState.players[action.playerId];
+      if (!player || !player.inJail || player.getOutOfJailCards < 1) break;
+
+      newState.players = {
+        ...newState.players,
+        [action.playerId]: {
+          ...player,
+          inJail: false,
+          jailTurns: 0,
+          getOutOfJailCards: player.getOutOfJailCards - 1,
+        },
+      };
+      break;
+    }
+
+    case 'PROPOSE_TRADE': {
+      newState.tradeOffers = [...newState.tradeOffers, action.offer];
+      break;
+    }
+
+    case 'ACCEPT_TRADE': {
+      const trade = newState.tradeOffers.find(t => t.id === action.tradeId);
+      if (!trade || trade.status !== 'pending') break;
+
+      const fromPlayer = newState.players[trade.fromPlayerId];
+      const toPlayer = newState.players[trade.toPlayerId];
+      if (!fromPlayer || !toPlayer) break;
+
+      newState.players = {
+        ...newState.players,
+        [trade.fromPlayerId]: {
+          ...fromPlayer,
+          money: fromPlayer.money - trade.offeredMoney + trade.requestedMoney,
+          properties: [
+            ...fromPlayer.properties.filter(p => !trade.offeredProperties.includes(p)),
+            ...trade.requestedProperties,
+          ],
+        },
+        [trade.toPlayerId]: {
+          ...toPlayer,
+          money: toPlayer.money + trade.offeredMoney - trade.requestedMoney,
+          properties: [
+            ...toPlayer.properties.filter(p => !trade.requestedProperties.includes(p)),
+            ...trade.offeredProperties,
+          ],
+        },
+      };
+
+      for (const propIdx of trade.offeredProperties) {
+        newState.properties[propIdx] = {
+          ...newState.properties[propIdx],
+          ownerId: trade.toPlayerId,
+        };
+      }
+      for (const propIdx of trade.requestedProperties) {
+        newState.properties[propIdx] = {
+          ...newState.properties[propIdx],
+          ownerId: trade.fromPlayerId,
+        };
+      }
+
+      newState.tradeOffers = newState.tradeOffers.map(t =>
+        t.id === action.tradeId ? { ...t, status: 'accepted' as const } : t
+      );
+      break;
+    }
+
+    case 'REJECT_TRADE': {
+      newState.tradeOffers = newState.tradeOffers.map(t =>
+        t.id === action.tradeId ? { ...t, status: 'rejected' as const } : t
+      );
+      break;
+    }
+
+    case 'CANCEL_TRADE': {
+      newState.tradeOffers = newState.tradeOffers.map(t =>
+        t.id === action.tradeId ? { ...t, status: 'cancelled' as const } : t
+      );
+      break;
+    }
+
+    case 'DECLARE_BANKRUPTCY': {
+      const player = newState.players[action.playerId];
+      if (!player) break;
+
+      if (action.creditorId && newState.players[action.creditorId]) {
+        const creditor = newState.players[action.creditorId];
+        newState.players = {
+          ...newState.players,
+          [action.creditorId]: {
+            ...creditor,
+            money: creditor.money + player.money,
+            properties: [...creditor.properties, ...player.properties],
+            getOutOfJailCards: creditor.getOutOfJailCards + player.getOutOfJailCards,
+          },
+        };
+        for (const propIdx of player.properties) {
+          newState.properties[propIdx] = {
+            ...newState.properties[propIdx],
+            ownerId: action.creditorId,
+          };
+        }
+      } else {
+        for (const propIdx of player.properties) {
+          newState.properties[propIdx] = {
+            ownerId: null,
+            houses: 0,
+            isMortgaged: false,
+          };
+        }
+      }
+
+      newState.players = {
+        ...newState.players,
+        [action.playerId]: {
+          ...player,
+          isBankrupt: true,
+          money: 0,
+          properties: [],
+        },
+      };
+
+      const winner = checkWinner(newState);
+      if (winner) {
+        newState.winnerId = winner;
+        newState.phase = 'finished';
+      }
+      break;
+    }
+
+    case 'END_TURN': {
+      const currentPlayer = getCurrentPlayer(newState);
+      if (!currentPlayer || currentPlayer.id !== action.playerId) break;
+
+      const nextPlayerIndex = getNextPlayerIndex(newState);
+      newState.currentPlayerIndex = nextPlayerIndex;
+      newState.currentDiceRoll = null;
+      newState.doublesCount = 0;
+      newState.turnPhase = 'pre-roll';
+      newState.pendingAction = null;
+
+      newState.players = {
+        ...newState.players,
+        [currentPlayer.id]: { ...currentPlayer, hasRolled: false },
+      };
+
+      newState.tradeOffers = newState.tradeOffers.filter(t => t.status === 'pending');
+      break;
+    }
+  }
+
+  return newState;
+}

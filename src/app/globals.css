@@ -1,26 +1,214 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0f;
+  --foreground: #f0f0f5;
+
+  /* Crypto theme colors */
+  --bitcoin: #f7931a;
+  --ethereum: #627eea;
+  --solana: #00ffa3;
+  --bnb: #f3ba2f;
+  --cardano: #0033ad;
+  --polkadot: #e6007a;
+  --chainlink: #375bd2;
+  --avalanche: #e84142;
+
+  /* Property group colors */
+  --group-meme: #8b4513;
+  --group-layer2: #87ceeb;
+  --group-defi: #ff69b4;
+  --group-smart: #ffa500;
+  --group-oracle: #dc143c;
+  --group-rising: #ffd700;
+  --group-layer1: #228b22;
+  --group-elite: #0000cd;
+  --group-railroad: #2f2f2f;
+  --group-utility: #808080;
+
+  /* UI colors */
+  --primary: #00ffa3;
+  --primary-dark: #00cc82;
+  --secondary: #627eea;
+  --accent: #f7931a;
+  --danger: #e84142;
+  --success: #00ffa3;
+  --warning: #f3ba2f;
+
+  /* Glass effect */
+  --glass-bg: rgba(20, 20, 30, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.1);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 163, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 163, 0.5);
+}
+
+/* Glass morphism utilities */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+}
+
+/* Glow effects */
+.glow-primary {
+  box-shadow: 0 0 20px rgba(0, 255, 163, 0.3);
+}
+
+.glow-accent {
+  box-shadow: 0 0 20px rgba(247, 147, 26, 0.3);
+}
+
+.glow-secondary {
+  box-shadow: 0 0 20px rgba(98, 126, 234, 0.3);
+}
+
+/* Text gradient */
+.text-gradient {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 50%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Animated border */
+@keyframes border-pulse {
+  0%, 100% { border-color: rgba(0, 255, 163, 0.5); }
+  50% { border-color: rgba(0, 255, 163, 0.2); }
+}
+
+.border-pulse {
+  animation: border-pulse 2s ease-in-out infinite;
+}
+
+/* Dice roll animation */
+@keyframes dice-shake {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  25% { transform: translateX(-5px) rotate(-5deg); }
+  75% { transform: translateX(5px) rotate(5deg); }
+}
+
+.dice-shake {
+  animation: dice-shake 0.1s ease-in-out infinite;
+}
+
+/* Token bounce */
+@keyframes token-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.token-bounce {
+  animation: token-bounce 0.5s ease-in-out;
+}
+
+/* Button styles */
+.btn {
+  @apply px-6 py-3 rounded-xl font-semibold transition-all duration-200;
+  @apply hover:scale-105 active:scale-95;
+  @apply disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100;
+}
+
+.btn-primary {
+  @apply bg-[var(--primary)] text-black;
+  @apply hover:bg-[var(--primary-dark)] hover:shadow-lg;
+  box-shadow: 0 0 20px rgba(0, 255, 163, 0.3);
+}
+
+.btn-secondary {
+  @apply bg-transparent border-2 border-[var(--primary)] text-[var(--primary)];
+  @apply hover:bg-[var(--primary)] hover:text-black;
+}
+
+.btn-danger {
+  @apply bg-[var(--danger)] text-white;
+  @apply hover:brightness-110;
+}
+
+/* Card styles */
+.card {
+  @apply rounded-2xl p-6;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+}
+
+/* Property group colors */
+.property-meme { background-color: var(--group-meme); }
+.property-layer2 { background-color: var(--group-layer2); }
+.property-defi { background-color: var(--group-defi); }
+.property-smart { background-color: var(--group-smart); }
+.property-oracle { background-color: var(--group-oracle); }
+.property-rising { background-color: var(--group-rising); }
+.property-layer1 { background-color: var(--group-layer1); }
+.property-elite { background-color: var(--group-elite); }
+.property-railroad { background-color: var(--group-railroad); }
+.property-utility { background-color: var(--group-utility); }
+
+/* Input styles */
+input, select {
+  @apply bg-white/5 border border-white/10 rounded-xl px-4 py-3;
+  @apply text-white placeholder:text-white/40;
+  @apply focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)];
+  @apply transition-all duration-200;
+}
+
+/* Modal overlay */
+.modal-overlay {
+  @apply fixed inset-0 bg-black/70 backdrop-blur-sm;
+  @apply flex items-center justify-center z-50;
+}
+
+/* Loading spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  @apply w-8 h-8 border-4 border-white/20 border-t-[var(--primary)] rounded-full;
+  animation: spin 1s linear infinite;
 }
